@@ -109,16 +109,18 @@ export default function WhatsAppInterface() {
         return baseBody
     }
   }
-
+  console.log(constructRequestBody)
   const handleSend = async () => {
     if (!message.phoneNumber || !message.content) {
       alert("Please enter both phone number and message content")
       return
     }
-
+    console.log("start 1")
     const endpoint = `${process.env.NEXT_PUBLIC_WHATSAPP_API_URL}/${process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID}/messages`
-
+    console.log(endpoint)
+    console.log("Message ",message)
     try {
+      console.log("start 2")
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -129,6 +131,8 @@ export default function WhatsAppInterface() {
       })
 
       if (response.ok) {
+        console.log("start 3")
+
         alert("Message sent successfully")
         setMessage({ ...message, content: "" })
         setLink("")

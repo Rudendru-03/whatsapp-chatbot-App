@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import WhatsAppInterface from "../components/WhatsAppInterface"
-import { DashboardLayout } from "../components/DashboardLayout"
+// import { DashboardLayout } from "../components/DashboardLayout"
 
 export default function Home() {
   return (
