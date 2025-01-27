@@ -9,7 +9,7 @@ export default function Home() {
       <h1 className="text-4xl font-bold mb-8">WhatsApp Chatbot Dashboard</h1>
       <div className="flex space-x-4">
         <WhatsAppInterface />
-        <Link href="/dashboard">
+        {/* <Link href="/dashboard">
           <Button>Dashboard</Button>
         </Link>
         <Link href="/products">
@@ -17,7 +17,7 @@ export default function Home() {
         </Link>
         <Link href="/conference">
           <Button>Conference</Button>
-        </Link>
+        </Link> */}
       </div>
       {/* <DashboardLayout /> */}
     </main>

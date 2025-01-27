@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +32,8 @@ export default function WhatsAppInterface() {
   })
   const [link, setLink] = useState("")
   const [messageId, setMessageId] = useState("")
+  const [messages, setMessages] = useState<Message[]>([]);
+  const messagesEndRef = useRef(null);
 
   const constructRequestBody = (message: Message) => {
     const baseBody = {
@@ -117,6 +119,8 @@ export default function WhatsAppInterface() {
     }
 
     const endpoint = `${process.env.NEXT_PUBLIC_WHATSAPP_API_URL}/${process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID}/messages`
+    console.log("endpoint: " + endpoint);
+    console.log("constructRequestBody: " + JSON.stringify(constructRequestBody(message)));
 
     try {
       const response = await fetch(endpoint, {
@@ -130,6 +134,7 @@ export default function WhatsAppInterface() {
 
       if (response.ok) {
         alert("Message sent successfully")
+        setMessages((prevMessages) => [...prevMessages, message]);
         setMessage({ ...message, content: "" })
         setLink("")
         setMessageId("")
@@ -142,6 +147,10 @@ export default function WhatsAppInterface() {
     }
   }
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   return (
     <div className="flex h-full flex-col bg-whatsapp-light">
       <div className="bg-primary p-4">
@@ -152,7 +161,24 @@ export default function WhatsAppInterface() {
           className="bg-white mb-2"
         />
       </div>
-      <div className="flex-1 p-4">{/* Message history would go here */}</div>
+      <div className="flex-1 p-4 overflow-y-auto">
+        {messages.length === 0 ? (
+          <p className="text-gray-500 text-center">No messages yet</p>
+        ) : (
+          messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`p-2 my-2 rounded-lg ${msg.phoneNumber === message.phoneNumber
+                ? "bg-green-200 self-end text-right"
+                : "bg-gray-200 self-start text-left"
+                }`}
+            >
+              <p className="font-semibold">{msg.phoneNumber}</p>
+              <p>{msg.content}</p>
+            </div>
+          ))
+        )}
+      </div>
       <Card className="rounded-none border-t">
         <Tabs defaultValue="text" className="w-full">
           <TabsList className="grid w-full grid-cols-6 bg-white p-0">
