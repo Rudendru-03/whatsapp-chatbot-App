@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ status: "success", results });
   } catch (_error) {
-    console.error("Error broadcasting message:", error);
+    console.error("Error broadcasting message:", _error);
     return NextResponse.json(
       { error: "Failed to broadcast message" },
       { status: 500 }

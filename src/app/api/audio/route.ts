@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (_error) {
     return NextResponse.json(
-      { error: "Failed to send audio" },
+      { _error: "Failed to send audio" },
       { status: 500 }
     );
   }
