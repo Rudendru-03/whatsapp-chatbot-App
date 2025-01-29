@@ -10,14 +10,26 @@ export default function SendMessagePage(): JSX.Element {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const broadcastNumbers = ["919370435262", "918810609657", "918745813705"];
+
   const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    await sendToServer(phone, message, file);
+  };
+
+  const broadcastMessages = async () => {
+    for (const phoneNumber of broadcastNumbers) {
+      await sendToServer(phoneNumber, message, file);
+    }
+  };
+
+  const sendToServer = async (phoneNumber: string, textMessage: string, fileToSend: File | null) => {
     const formData = new FormData();
-    formData.append("phone", phone);
-    formData.append("message", message);
-    if (file) {
-      formData.append("file", file);
+    formData.append("phone", phoneNumber);
+    formData.append("message", textMessage);
+    if (fileToSend) {
+      formData.append("file", fileToSend);
     }
 
     try {
@@ -29,14 +41,12 @@ export default function SendMessagePage(): JSX.Element {
       const result = await res.json();
 
       if (res.ok) {
-        setResponseMessage({ success: true, message: "Message sent successfully!" });
-        setMessage("");
-        setFile(null);
+        setResponseMessage({ success: true, message: `Message sent to successfully!` });
       } else {
-        setResponseMessage({ success: false, message: result.error });
+        setResponseMessage({ success: false, message: `Failed to send message: ${result.error}` });
       }
     } catch (error) {
-      setResponseMessage({ success: false, message: "Something went wrong!" });
+      setResponseMessage({ success: false, message: `Something went wrong while sending messages` });
     }
   };
 
@@ -116,26 +126,49 @@ export default function SendMessagePage(): JSX.Element {
               )}
             </div>
           </div>
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center bg-[#25D366] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-5 h-5 mr-2"
+          <div className="space-y-2">
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center bg-[#25D366] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.5 12h15m0 0l-6-6m6 6l-6 6"
-              />
-            </svg>
-            Send Message
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5 mr-2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.5 12h15m0 0l-6-6m6 6l-6 6"
+                />
+              </svg>
+              Send Message
+            </button>
+            <button
+              type="button"
+              onClick={broadcastMessages}
+              className="w-full flex items-center justify-center bg-[#34b7f1] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5 mr-2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.5 10.5H7.5m0 0l4.5-4.5m-4.5 4.5l4.5 4.5"
+                />
+              </svg>
+              Broadcast Messages
+            </button>
+          </div>
         </form>
         {responseMessage && (
           <p
