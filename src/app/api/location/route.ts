@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       Number.parseFloat(longitude)
     );
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Failed to send location" },
       { status: 500 }

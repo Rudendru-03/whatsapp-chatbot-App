@@ -7,9 +7,9 @@ export async function POST(req: Request) {
   try {
     await sendWhatsAppMessage(phoneNumber, content);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
-      { error: "Failed to send message" },
+      { _error: "Failed to send message" },
       { status: 500 }
     );
   }

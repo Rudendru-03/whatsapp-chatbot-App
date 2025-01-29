@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   try {
     await sendWhatsAppAudio(phoneNumber, content);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Failed to send audio" },
       { status: 500 }

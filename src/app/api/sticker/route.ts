@@ -7,9 +7,9 @@ export async function POST(req: Request) {
   try {
     await sendWhatsAppSticker(phoneNumber, content);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
-      { error: "Failed to send sticker" },
+      { _error: "Failed to send sticker" },
       { status: 500 }
     );
   }

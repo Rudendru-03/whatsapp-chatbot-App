@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   try {
     await sendWhatsAppImage(phoneNumber, content);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Failed to send image" },
       { status: 500 }
