@@ -26,6 +26,7 @@ async function uploadMedia(file: File): Promise<string> {
   }
 
   const data = await response.json();
+  console.log(data.id);
   return data.id;
 }
 
@@ -106,12 +107,13 @@ export async function POST(req: Request): Promise<NextResponse> {
         mimeType === "text/csv" ||
         mimeType === "application/vnd.ms-excel" ||
         mimeType ===
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       ) {
         mediaType = "document";
       } else {
         throw new Error(`Unsupported file type: ${mimeType}`);
       }
+      console.log("Detected MIME type:", mimeType);
     }
 
     await sendMessage(phone, message, mediaId, mediaType, file ?? undefined);
