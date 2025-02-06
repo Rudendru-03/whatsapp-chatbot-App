@@ -1,49 +1,100 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextApiRequest, NextApiResponse } from "next";
+import axios from "axios";
 
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+// Define expected environment variables
+const { WHATSAPP_VERIFY_TOKEN, NEXT_PUBLIC_WHATSAPP_API_TOKEN } = process.env;
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const queryParams = new URL(req.url).searchParams;
-  const mode = queryParams.get("hub.mode");
-  const token = queryParams.get("hub.verify_token");
-  const challenge = queryParams.get("hub.challenge");
-
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("Webhook Verified!");
-    return new NextResponse(challenge || "", { status: 200 });
-  }
-
-  console.error("Webhook Verification Failed!");
-  return new NextResponse("Forbidden", { status: 403 });
+// Define the structure of a WhatsApp message
+interface WhatsAppMessage {
+  id: string;
+  from: string;
+  type: string;
+  text?: { body: string };
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  try {
-    const body = await req.json();
+// Define the structure of the request body
+interface WhatsAppWebhookPayload {
+  entry?: {
+    changes?: {
+      value?: {
+        metadata?: { phone_number_id: string };
+        messages?: WhatsAppMessage[];
+      };
+    }[];
+  }[];
+}
 
-    console.log("Webhook Event Received:", JSON.stringify(body, null, 2));
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method === "POST") {
+    console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
-    if (body.object === "whatsapp_business_account") {
-      const entry = body.entry;
+    const payload = req.body as WhatsAppWebhookPayload;
+    const message = payload.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-      for (const e of entry) {
-        const changes = e.changes;
+    if (message?.type === "text" && message.text?.body) {
+      const businessPhoneNumberId =
+        payload.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
 
-        for (const change of changes) {
-          const messageData = change.value.messages?.[0];
-          if (messageData) {
-            const from = messageData.from;
-            const text = messageData.text?.body;
-
-            console.log(`Message received from ${from}: ${text}`);
-          }
-        }
+      if (!businessPhoneNumberId) {
+        return res.status(400).json({ error: "Missing phone number ID" });
       }
-    }
 
-    return new NextResponse("Event Received", { status: 200 });
-  } catch (error) {
-    console.error("Error handling webhook event:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+      try {
+        // Send a reply message
+        await axios.post(
+          `https://graph.facebook.com/v18.0/${businessPhoneNumberId}/messages`,
+          {
+            messaging_product: "whatsapp",
+            to: message.from,
+            text: { body: "Echo: " + message.text.body },
+            context: { message_id: message.id },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${NEXT_PUBLIC_WHATSAPP_API_TOKEN}`,
+            },
+          }
+        );
+
+        // Mark message as read
+        await axios.post(
+          `https://graph.facebook.com/v18.0/${businessPhoneNumberId}/messages`,
+          {
+            messaging_product: "whatsapp",
+            status: "read",
+            message_id: message.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${NEXT_PUBLIC_WHATSAPP_API_TOKEN}`,
+            },
+          }
+        );
+
+        return res.status(200).send("Message processed");
+      } catch (error: any) {
+        console.error("Error sending message:", error.response?.data || error);
+        return res.status(500).json({ error: "Error processing message" });
+      }
+    } else {
+      return res.status(200).send("No text message detected");
+    }
+  } else if (req.method === "GET") {
+    // Webhook verification
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    if (mode === "subscribe" && token === WHATSAPP_VERIFY_TOKEN) {
+      console.log("Webhook verified successfully!");
+      return res.status(200).send(challenge);
+    } else {
+      return res.status(403).send("Forbidden");
+    }
   }
+
+  return res.status(405).send("Method Not Allowed");
 }
