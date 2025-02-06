@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import axios from "axios";
 
@@ -33,8 +34,8 @@ export async function POST(req: NextRequest) {
       const businessPhoneNumberId = changes.metadata?.phone_number_id;
       if (!businessPhoneNumberId) {
         console.error("❌ Missing phone number ID");
-        return new Response(
-          JSON.stringify({ error: "Missing phone number ID" }),
+        return NextResponse.json(
+          { error: "Missing phone number ID" },
           { status: 400 }
         );
       }
@@ -76,7 +77,10 @@ export async function POST(req: NextRequest) {
       );
 
       console.log(`✅ Marked as Read: ${messageId}`);
-      return new Response("Message processed", { status: 200 });
+      return NextResponse.json(
+        { message: "Message processed" },
+        { status: 200 }
+      );
     }
 
     // 🔹 Check if it's a message status update
@@ -95,17 +99,23 @@ export async function POST(req: NextRequest) {
       );
       console.log(`   📌 Status: ${status.toUpperCase()}`);
 
-      return new Response("Status update processed", { status: 200 });
+      return NextResponse.json(
+        { message: "Status update processed" },
+        { status: 200 }
+      );
     }
 
     console.log("⚠️ No relevant data found in webhook event.");
-    return new Response("No action taken", { status: 200 });
+    return NextResponse.json({ message: "No action taken" }, { status: 200 });
   } catch (error: any) {
     console.error(
       "❌ Error processing message:",
       error.response?.data || error.message
     );
-    return new Response("Error processing message", { status: 500 });
+    return NextResponse.json(
+      { error: "Error processing message" },
+      { status: 500 }
+    );
   }
 }
 
@@ -128,5 +138,5 @@ export async function GET(req: NextRequest) {
   }
 
   console.error("❌ Webhook verification failed.");
-  return new Response("Forbidden", { status: 403 });
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
