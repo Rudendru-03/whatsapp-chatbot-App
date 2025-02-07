@@ -63,122 +63,120 @@ export default function SendMessagePage(): JSX.Element {
   };
 
   return (
-    <div className="flex justify-center items-center h-screen text-white">
-      <div className="w-full max-w-lg bg-white shadow-xl rounded-2xl p-8">
-        <h1 className="text-2xl font-bold text-[#075e54] mb-6 text-center">
-          Send WhatsApp Message
-        </h1>
-        <form onSubmit={sendMessage} className="space-y-4">
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Phone Number
-            </label>
-            <input
-              id="phone"
-              type="text"
-              placeholder="e.g., +1234567890"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54]"
+    <div className="h-full bg-gray-100 rounded-lg shadow-lg">
+      <h1 className="text-2xl font-bold text-[#075e54] mb-6 text-center">
+        Send WhatsApp Message
+      </h1>
+      <form onSubmit={sendMessage} className="space-y-4">
+        <div>
+          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+            Phone Number
+          </label>
+          <input
+            id="phone"
+            type="text"
+            placeholder="e.g., +1234567890"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54]"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+            Message
+          </label>
+          <div className="relative">
+            <textarea
+              id="message"
+              placeholder="Enter your message here"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54] resize-none pr-10"
               required
             />
-          </div>
-          <div>
-            <label htmlFor="message" className="block text-sm font-medium text-gray-700">
-              Message
-            </label>
-            <div className="relative">
-              <textarea
-                id="message"
-                placeholder="Enter your message here"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54] resize-none pr-10"
-                required
-              />
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <div
-                className="absolute top-2 right-2 text-[#075e54] cursor-pointer hover:text-[#128c7e]"
-                onClick={triggerFileInput}
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div
+              className="absolute top-2 right-2 text-[#075e54] cursor-pointer hover:text-[#128c7e]"
+              onClick={triggerFileInput}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-6 h-6"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4.5v15m7.5-7.5h-15"
-                  />
-                </svg>
-              </div>
-              {file && (
-                <p className="mt-2 text-sm text-gray-600">Attached: {file.name}</p>
-              )}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
             </div>
+            {file && (
+              <p className="mt-2 text-sm text-gray-600">Attached: {file.name}</p>
+            )}
           </div>
-          <div className="space-y-2">
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center bg-[#25D366] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5 mr-2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.5 12h15m0 0l-6-6m6 6l-6 6"
-                />
-              </svg>
-              Send Message
-            </button>
-            <button
-              type="button"
-              onClick={broadcastMessages}
-              className="w-full flex items-center justify-center bg-[#34b7f1] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5 mr-2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16.5 10.5H7.5m0 0l4.5-4.5m-4.5 4.5l4.5 4.5"
-                />
-              </svg>
-              Broadcast Messages
-            </button>
-          </div>
-        </form>
-        {responseMessage && (
-          <p
-            className={`mt-4 text-center text-lg font-medium ${responseMessage.success ? "text-green-400" : "text-red-400"
-              }`}
+        </div>
+        <div className="space-y-2">
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center bg-[#25D366] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
           >
-            {responseMessage.message}
-          </p>
-        )}
-      </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-5 h-5 mr-2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.5 12h15m0 0l-6-6m6 6l-6 6"
+              />
+            </svg>
+            Send Message
+          </button>
+          <button
+            type="button"
+            onClick={broadcastMessages}
+            className="w-full flex items-center justify-center bg-[#34b7f1] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-5 h-5 mr-2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 10.5H7.5m0 0l4.5-4.5m-4.5 4.5l4.5 4.5"
+              />
+            </svg>
+            Broadcast Messages
+          </button>
+        </div>
+      </form>
+      {responseMessage && (
+        <p
+          className={`mt-4 text-center text-lg font-medium ${responseMessage.success ? "text-green-400" : "text-red-400"
+            }`}
+        >
+          {responseMessage.message}
+        </p>
+      )}
     </div>
   );
 }
