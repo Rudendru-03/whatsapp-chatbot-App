@@ -1,52 +1,132 @@
-import { NextResponse } from "next/server";
-import { sendWhatsAppMessage } from "@/lib/whatsapp-api";
+import type { NextRequest } from "next/server";
+import axios from "axios";
 
-export async function POST(req: Request) {
-  const body = await req.json();
+const { NEXT_PUBLIC_WHATSAPP_API_TOKEN, WHATSAPP_VERIFY_TOKEN } = process.env;
 
-  // Verify the webhook
-  if (body.object === "whatsapp_business_account") {
-    for (const entry of body.entry) {
-      for (const change of entry.changes) {
-        if (change.field === "messages") {
-          for (const message of change.value.messages) {
-            if (message.type === "text") {
-              const phone = message.from;
-              const text = message.text.body;
+/**
+ * Handle incoming WhatsApp messages and status updates.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    console.log("📩 Incoming Webhook Data:", JSON.stringify(body, null, 2));
 
-              // Process the message and generate a response
-              const response = await processMessage(text);
+    const changes = body.entry?.[0]?.changes?.[0]?.value;
 
-              // Send the response back to the user
-              await sendWhatsAppMessage(phone, response);
-            }
-          }
-        }
+    // 🔹 Check if it's a message
+    if (changes?.messages) {
+      const message = changes.messages[0];
+      const sender = message.from;
+      const text = message.text?.body || "[Non-text message]";
+      const timestamp = message.timestamp;
+      const messageId = message.id;
+
+      console.log(`📥 Received Message:`);
+      console.log(`   🆔 ID: ${messageId}`);
+      console.log(`   👤 From: ${sender}`);
+      console.log(
+        `   🕒 Timestamp: ${new Date(timestamp * 1000).toLocaleString()}`
+      );
+      console.log(`   💬 Message: ${text}`);
+
+      // 🔹 Extract business phone number ID
+      const businessPhoneNumberId = changes.metadata?.phone_number_id;
+      if (!businessPhoneNumberId) {
+        console.error("❌ Missing phone number ID");
+        return new Response(
+          JSON.stringify({ error: "Missing phone number ID" }),
+          { status: 400 }
+        );
       }
+
+      // 🔹 Reply to the user
+      const replyText = `Echo: ${text}`;
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${businessPhoneNumberId}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: sender,
+          text: { body: replyText },
+          context: { message_id: messageId },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${NEXT_PUBLIC_WHATSAPP_API_TOKEN}`,
+          },
+        }
+      );
+
+      console.log(`📤 Sent Reply:`);
+      console.log(`   🆔 To: ${sender}`);
+      console.log(`   💬 Message: ${replyText}`);
+
+      // 🔹 Mark the message as read
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${businessPhoneNumberId}/messages`,
+        {
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: messageId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${NEXT_PUBLIC_WHATSAPP_API_TOKEN}`,
+          },
+        }
+      );
+
+      console.log(`✅ Marked as Read: ${messageId}`);
+      return new Response("Message processed", { status: 200 });
     }
-    return NextResponse.json({ status: "ok" });
+
+    // 🔹 Check if it's a message status update
+    if (changes?.statuses) {
+      const statusUpdate = changes.statuses[0];
+      const statusMessageId = statusUpdate.id;
+      const recipient = statusUpdate.recipient_id;
+      const status = statusUpdate.status;
+      const timestamp = statusUpdate.timestamp;
+
+      console.log(`📡 Message Status Update:`);
+      console.log(`   🆔 ID: ${statusMessageId}`);
+      console.log(`   👤 Recipient: ${recipient}`);
+      console.log(
+        `   🕒 Timestamp: ${new Date(timestamp * 1000).toLocaleString()}`
+      );
+      console.log(`   📌 Status: ${status.toUpperCase()}`);
+
+      return new Response("Status update processed", { status: 200 });
+    }
+
+    console.log("⚠️ No relevant data found in webhook event.");
+    return new Response("No action taken", { status: 200 });
+  } catch (error: any) {
+    console.error(
+      "❌ Error processing message:",
+      error.response?.data || error.message
+    );
+    return new Response("Error processing message", { status: 500 });
   }
-
-  return NextResponse.json({ status: "error" }, { status: 400 });
 }
 
-async function processMessage(text: string): Promise<string> {
-  // This is where you'd implement your chatbot logic
-  // For now, we'll just echo the message back
-  return `You said: ${text}`;
-}
-
-// Handle the GET request for webhook verification
-export async function GET(req: Request) {
+/**
+ * Webhook verification for WhatsApp API
+ */
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  // Replace 'YOUR_VERIFY_TOKEN' with your actual verify token
-  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  console.log("🔍 Webhook Verification Request:");
+  console.log(`   Mode: ${mode}`);
+  console.log(`   Token: ${token}`);
+
+  if (mode === "subscribe" && token === WHATSAPP_VERIFY_TOKEN) {
+    console.log("✅ Webhook verified successfully!");
     return new Response(challenge, { status: 200 });
-  } else {
-    return new Response("Verification failed", { status: 403 });
   }
+
+  console.error("❌ Webhook verification failed.");
+  return new Response("Forbidden", { status: 403 });
 }

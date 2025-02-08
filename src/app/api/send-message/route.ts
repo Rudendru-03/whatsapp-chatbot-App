@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_API_URL = "https://graph.facebook.com/v17.0";
+const WHATSAPP_ACCESS_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 
 async function uploadMedia(file: File): Promise<string> {
   const formData = new FormData();
@@ -26,7 +27,7 @@ async function uploadMedia(file: File): Promise<string> {
   }
 
   const data = await response.json();
-  console.log(data.id)
+  console.log(data.id);
   return data.id;
 }
 
