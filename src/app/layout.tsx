@@ -21,7 +21,7 @@ export default function RootLayout({
       <body className={`${inter.className} flex flex-col h-full`}>
         <SidebarProvider>
           <AppSidebar className="fixed left-0 top-0 h-screen w-64 border-r" />
-          <main className="ml-64 flex-1 min-h-screen p-4">
+          <main className="flex-1 min-h-screen">
             <SidebarTrigger />
             {children}
           </main>
