@@ -1,38 +1,85 @@
-"use client";
+'use client';
 
-import { JSX, useState, useRef } from "react";
+import { JSX, useState, useRef, useEffect } from "react";
+
+interface Message {
+  content: string;
+  isSent: boolean;
+  timestamp: Date;
+  status: 'sent' | 'delivered' | 'read';
+  from?: string;
+  to?: string;
+  file?: {
+    name: string;
+    type: string;
+    url: string;
+  };
+}
 
 export default function SendMessagePage(): JSX.Element {
   const [phone, setPhone] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
-  const [responseMessage, setResponseMessage] = useState<{ success: boolean; message: string } | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [responseMessage, setResponseMessage] = useState<{
+    success: boolean;
+    message: string
+  } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const broadcastNumbers = ["919370435262", "918810609657", "918745813705"];
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch('/api/messages');
+        const data = await res.json();
+        setMessages(data.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })));
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!phone || !message) return;
 
-    await sendToServer(phone, message, file);
-  };
-
-  const broadcastMessages = async () => {
-    for (const phoneNumber of broadcastNumbers) {
-      await sendToServer(phoneNumber, message, file);
-    }
-  };
-
-  const sendToServer = async (phoneNumber: string, textMessage: string, fileToSend: File | null) => {
-    const formData = new FormData();
-    formData.append("phone", phoneNumber);
-    formData.append("message", textMessage);
-    if (fileToSend) {
-      formData.append("file", fileToSend);
-    }
+    const newMessage: Message = {
+      content: message,
+      isSent: true,
+      timestamp: new Date(),
+      status: 'sent',
+      to: phone,
+      ...(file && {
+        file: {
+          name: file.name,
+          type: file.type,
+          url: URL.createObjectURL(file)
+        }
+      })
+    };
 
     try {
+      const formData = new FormData();
+      formData.append("phone", phone);
+      formData.append("message", message);
+      if (file) formData.append("file", file);
+
       const res = await fetch("/api/send-message", {
         method: "POST",
         body: formData,
@@ -40,142 +87,217 @@ export default function SendMessagePage(): JSX.Element {
 
       const result = await res.json();
 
-      if (res.ok) {
-        setResponseMessage({ success: true, message: `Message sent to successfully!` });
-      } else {
-        setResponseMessage({ success: false, message: `Failed to send message: ${result.error}` });
-      }
+      setResponseMessage(res.ok ?
+        { success: true, message: `Message sent to ${phone}` } :
+        { success: false, message: result.error || "Failed to send message" }
+      );
+
+      setMessages(prev => [...prev, {
+        ...newMessage,
+        status: res.ok ? 'delivered' : 'sent'
+      }]);
+
     } catch (error) {
-      setResponseMessage({ success: false, message: `Something went wrong while sending messages` });
+      setResponseMessage({
+        success: false,
+        message: "Failed to connect to server"
+      });
+      setMessages(prev => [...prev, newMessage]);
     }
+
+    setMessage("");
+    setFile(null);
+  };
+
+  const broadcastMessages = async () => {
+    for (const number of broadcastNumbers) {
+      const formData = new FormData();
+      formData.append("phone", number);
+      formData.append("message", message);
+      if (file) formData.append("file", file);
+
+      await fetch("/api/send-message", {
+        method: "POST",
+        body: formData,
+      });
+    }
+    setResponseMessage({
+      success: true,
+      message: `Broadcasted to ${broadcastNumbers.length} contacts`
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
+    if (e.target.files?.[0]) setFile(e.target.files[0]);
   };
 
-  const triggerFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
+  const triggerFileInput = () => fileInputRef.current?.click();
 
   return (
-    <div className="h-full bg-gray-100 rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold text-[#075e54] mb-6 text-center">
-        Send WhatsApp Message
-      </h1>
-      <form onSubmit={sendMessage} className="space-y-4">
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-            Phone Number
-          </label>
-          <input
-            id="phone"
-            type="text"
-            placeholder="e.g., +1234567890"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54]"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="message" className="block text-sm font-medium text-gray-700">
-            Message
-          </label>
-          <div className="relative">
+    <div className="h-full flex flex-col bg-[#ece5dd]">
+      {/* Chat Header */}
+      <div className="bg-[#075e54] p-4 flex items-center justify-between">
+        <input
+          type="text"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Enter phone number (+1234567890)"
+          className="bg-transparent text-white placeholder-gray-300 focus:outline-none w-full"
+        />
+      </div>
+
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2]">
+        {isLoading ? (
+          <div className="text-center text-gray-500">Loading messages...</div>
+        ) : messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`p-3 rounded-lg max-w-[80%] shadow ${msg.isSent ? 'bg-[#dcf8c6]' : 'bg-white'
+              }`}>
+              {!msg.isSent && (
+                <div className="text-xs text-gray-500 mb-1">
+                  From: {msg.from}
+                </div>
+              )}
+              {msg.file && (
+                <div className="mb-2">
+                  {msg.file.type.startsWith('image/') ? (
+                    <img
+                      src={msg.file.url}
+                      alt={msg.file.name}
+                      className="max-w-full h-48 object-cover rounded"
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-500 flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      {msg.file.name}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-gray-800">{msg.content}</p>
+              <div className="flex items-center justify-end gap-2 mt-2">
+                <span className="text-xs text-gray-500">
+                  {msg.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+                {msg.isSent && (
+                  <span className="text-xs text-gray-500">
+                    {msg.status === 'read' ? '✓✓' :
+                      msg.status === 'delivered' ? '✓' : '◷'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="bg-white p-4 border-t border-gray-200">
+        <form onSubmit={sendMessage} className="flex gap-2">
+          <div className="relative flex-1">
+            <button
+              type="button"
+              onClick={triggerFileInput}
+              className="absolute left-2 top-2 text-[#075e54] hover:text-[#128c7e]"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                />
+              </svg>
+            </button>
             <textarea
-              id="message"
-              placeholder="Enter your message here"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="mt-1 w-full border border-[#075e54] rounded-lg px-4 py-2 bg-[#e5f4e3] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#075e54] focus:border-[#075e54] resize-none pr-10"
+              placeholder="Type a message"
+              className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
+              rows={1}
               required
             />
             <input
               type="file"
               ref={fileInputRef}
-              className="hidden"
               onChange={handleFileChange}
+              className="hidden"
             />
-            <div
-              className="absolute top-2 right-2 text-[#075e54] cursor-pointer hover:text-[#128c7e]"
-              onClick={triggerFileInput}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-            </div>
             {file && (
-              <p className="mt-2 text-sm text-gray-600">Attached: {file.name}</p>
+              <div className="absolute bottom-12 left-0 bg-white p-2 rounded-lg shadow flex items-center">
+                <span className="text-sm text-gray-600 mr-2">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  ×
+                </button>
+              </div>
             )}
           </div>
-        </div>
-        <div className="space-y-2">
           <button
             type="submit"
-            className="w-full flex items-center justify-center bg-[#25D366] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
+            className="bg-[#075e54] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-[#054d43]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
               fill="none"
               viewBox="0 0 24 24"
-              strokeWidth={1.5}
               stroke="currentColor"
-              className="w-5 h-5 mr-2"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M4.5 12h15m0 0l-6-6m6 6l-6 6"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
               />
             </svg>
-            Send Message
           </button>
-          <button
-            type="button"
-            onClick={broadcastMessages}
-            className="w-full flex items-center justify-center bg-[#34b7f1] hover:bg-[#128c7e] text-white font-bold py-2 px-4 rounded-lg shadow-lg"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-5 h-5 mr-2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.5 10.5H7.5m0 0l4.5-4.5m-4.5 4.5l4.5 4.5"
-              />
-            </svg>
-            Broadcast Messages
-          </button>
-        </div>
-      </form>
-      {responseMessage && (
-        <p
-          className={`mt-4 text-center text-lg font-medium ${responseMessage.success ? "text-green-400" : "text-red-400"
-            }`}
+        </form>
+
+        <button
+          onClick={broadcastMessages}
+          className="mt-2 w-full text-center text-sm text-[#075e54] hover:text-[#054d43]"
         >
+          Broadcast Message
+        </button>
+      </div>
+
+      {/* Status Messages */}
+      {responseMessage && (
+        <div className={`p-2 text-center text-sm ${responseMessage.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>
           {responseMessage.message}
-        </p>
+        </div>
       )}
     </div>
   );
