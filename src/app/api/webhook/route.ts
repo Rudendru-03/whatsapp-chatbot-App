@@ -21,40 +21,54 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = await req.json();
 
-    if (body.object === "whatsapp_business_account") {
-      for (const entry of body.entry) {
-        for (const change of entry.changes) {
-          // Handle incoming messages
-          const messageData = change.value.messages?.[0];
-          if (messageData?.type === 'text') {
-            const messagePayload = {
-              content: messageData.text.body,
-              isSent: false,
-              timestamp: new Date(parseInt(messageData.timestamp) * 1000),
-              status: 'delivered' as const,
-              from: messageData.from,
-              to: messageData.to
-            };
+    console.log("Webhook Event Received:", JSON.stringify(body, null, 2));
 
-            await fetch(`${process.env.NEXTAUTH_URL}/api/messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(messagePayload)
-            });
+    if (body.object === "whatsapp_business_account") {
+      const entry = body.entry;
+
+      for (const e of entry) {
+        const changes = e.changes;
+
+        for (const change of changes) {
+          // Handle incoming messages from users
+          const messageData = change.value.messages?.[0];
+          if (messageData) {
+            const from = messageData.from;
+            const messageId = messageData.id;
+            const timestamp = new Date(parseInt(messageData.timestamp) * 1000);
+            const messageType = messageData.type;
+
+            // Log text messages
+            if (messageType === "text") {
+              const text = messageData.text?.body;
+              console.log(`\n=== User Message Received ===`);
+              console.log(`From: ${from}`);
+              console.log(`Message ID: ${messageId}`);
+              console.log(`Timestamp: ${timestamp}`);
+              console.log(`Text: ${text}`);
+            }
+            // Add handling for other message types (image, video, etc.) here
           }
 
-          // Handle message status updates
+          // Handle message status updates (sent/delivered/read)
           const statusData = change.value.statuses?.[0];
           if (statusData) {
-            await fetch(`${process.env.NEXTAUTH_URL}/api/messages`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messageId: statusData.id,
-                status: statusData.status,
-                timestamp: new Date(parseInt(statusData.timestamp) * 1000)
-              })
-            });
+            const messageId = statusData.id;
+            const status = statusData.status;
+            const recipient = statusData.recipient_id;
+            const timestamp = new Date(parseInt(statusData.timestamp) * 1000);
+            const conversation = statusData.conversation?.id;
+            const pricing = statusData.pricing?.billable
+              ? `Cost: ${statusData.pricing.pricing_model}`
+              : "";
+
+            console.log(`\n=== Message Status Update ===`);
+            console.log(`Message ID: ${messageId}`);
+            console.log(`Status: ${status}`);
+            console.log(`Recipient: ${recipient}`);
+            console.log(`Timestamp: ${timestamp}`);
+            console.log(`Conversation ID: ${conversation}`);
+            console.log(`Pricing Model: ${pricing}`);
           }
         }
       }
