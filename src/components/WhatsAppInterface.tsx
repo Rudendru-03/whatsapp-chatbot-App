@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { JSX, useState, useRef, useEffect } from "react";
 
