@@ -1,147 +1,104 @@
-"use client"
+'use client';
 
-import { type JSX, useState, useRef, useEffect } from "react"
+import { JSX, useState, useRef, useEffect } from "react";
 
 interface Message {
-  content: string
-  isSent: boolean
-  timestamp: Date
-  status: "sent" | "delivered" | "read" | "received"
-  file?: File | null
-  mediaType?: string
-  mediaUrl?: string
+  content: string;
+  isSent: boolean;
+  timestamp: Date;
+  status: 'sent' | 'delivered' | 'read';
+  file?: File | null;
 }
 
 export default function SendMessagePage(): JSX.Element {
-  const [phone, setPhone] = useState<string>("")
-  const [message, setMessage] = useState<string>("")
-  const [file, setFile] = useState<File | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [phone, setPhone] = useState<string>("");
+  const [message, setMessage] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [responseMessage, setResponseMessage] = useState<{
-    success: boolean
+    success: boolean;
     message: string
-  } | null>(null)
+  } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const broadcastNumbers = ["919370435262", "918810609657", "918745813705"]
-
-  useEffect(() => {
-    const eventSource = new EventSource("/api/sse")
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.type === "newMessage") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...data.message,
-            timestamp: new Date(data.message.timestamp),
-          },
-        ])
-      }
-    }
-
-    return () => {
-      eventSource.close()
-    }
-  }, [])
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const broadcastNumbers = ["919370435262", "918810609657", "918745813705"];
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [])
-
-  // Add this effect after the SSE effect
-  useEffect(() => {
-    if (phone) {
-      fetch(`/api/messages?phone=${encodeURIComponent(phone)}`)
-        .then((res) => res.json())
-        .then((storedMessages) => {
-          setMessages(storedMessages)
-        })
-    }
-  }, [phone])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!phone || !message) return
+    e.preventDefault();
+    if (!phone || !message) return;
 
     // Add message to local state
     const newMessage: Message = {
       content: message,
       isSent: true,
       timestamp: new Date(),
-      status: "sent",
-      file,
-    }
-    setMessages((prev) => [...prev, newMessage])
+      status: 'sent',
+      file
+    };
+    setMessages(prev => [...prev, newMessage]);
 
     try {
-      const formData = new FormData()
-      formData.append("phone", phone)
-      formData.append("message", message)
-      if (file) formData.append("file", file)
+      const formData = new FormData();
+      formData.append("phone", phone);
+      formData.append("message", message);
+      if (file) formData.append("file", file);
 
       const res = await fetch("/api/send-message", {
         method: "POST",
         body: formData,
-      })
+      });
 
-      const result = await res.json()
+      const result = await res.json();
 
-      setResponseMessage(
-        res.ok
-          ? { success: true, message: `Message sent to ${phone}` }
-          : { success: false, message: result.error || "Failed to send message" },
-      )
+      setResponseMessage(res.ok ?
+        { success: true, message: `Message sent to ${phone}` } :
+        { success: false, message: result.error || "Failed to send message" }
+      );
 
       // Update message status
-      setMessages((prev) =>
-        prev.map((msg) => (msg === newMessage ? { ...msg, status: res.ok ? "delivered" : "sent" } : msg)),
-      )
+      setMessages(prev => prev.map(msg =>
+        msg === newMessage ? { ...msg, status: res.ok ? 'delivered' : 'sent' } : msg
+      ));
+
     } catch (error) {
       setResponseMessage({
         success: false,
-        message: "Failed to connect to server",
-      })
+        message: "Failed to connect to server"
+      });
     }
 
-    setMessage("")
-    setFile(null)
-  }
+    setMessage("");
+    setFile(null);
+  };
 
   const broadcastMessages = async () => {
     for (const number of broadcastNumbers) {
-      const formData = new FormData()
-      formData.append("phone", number)
-      formData.append("message", message)
-      if (file) formData.append("file", file)
+      const formData = new FormData();
+      formData.append("phone", number);
+      formData.append("message", message);
+      if (file) formData.append("file", file);
 
       await fetch("/api/send-message", {
         method: "POST",
         body: formData,
-      })
+      });
     }
     setResponseMessage({
       success: true,
-      message: `Broadcasted to ${broadcastNumbers.length} contacts`,
-    })
-  }
+      message: `Broadcasted to ${broadcastNumbers.length} contacts`
+    });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) setFile(e.target.files[0])
-  }
-
-  const triggerFileInput = () => fileInputRef.current?.click()
-
-  const getStatusIndicator = (status: string) => {
-    switch (status) {
-      case 'read': return '✓✓';
-      case 'delivered': return '✓';
-      case 'failed': return '⚠️';
-      default: return '◷';
-    }
+    if (e.target.files?.[0]) setFile(e.target.files[0]);
   };
+
+  const triggerFileInput = () => fileInputRef.current?.click();
 
   return (
     <div className="h-full flex flex-col bg-[#ece5dd]">
@@ -159,33 +116,12 @@ export default function SendMessagePage(): JSX.Element {
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2]">
         {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.isSent ? "justify-end" : "justify-start"}`}>
-            <div className={`p-3 rounded-lg max-w-[80%] shadow ${msg.isSent ? "bg-[#dcf8c6]" : "bg-white"}`}>
-              {msg.mediaType && msg.mediaUrl && (
-                <div className="mb-2">
-                  {msg.mediaType === "image" && (
-                    <img
-                      src={msg.mediaUrl || "/placeholder.svg"}
-                      alt="Received image"
-                      className="max-w-full h-auto rounded"
-                    />
-                  )}
-                  {msg.mediaType === "video" && (
-                    <video src={msg.mediaUrl} controls className="max-w-full h-auto rounded" />
-                  )}
-                  {msg.mediaType === "audio" && <audio src={msg.mediaUrl} controls className="max-w-full" />}
-                  {msg.mediaType === "document" && (
-                    <a
-                      href={msg.mediaUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 underline"
-                    >
-                      View Document
-                    </a>
-                  )}
-                </div>
-              )}
+          <div
+            key={index}
+            className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`p-3 rounded-lg max-w-[80%] shadow ${msg.isSent ? 'bg-[#dcf8c6]' : 'bg-white'
+              }`}>
               {msg.file && (
                 <div className="mb-2 text-sm text-gray-500 flex items-center">
                   <svg
@@ -205,17 +141,18 @@ export default function SendMessagePage(): JSX.Element {
                   {msg.file.name}
                 </div>
               )}
-              <p className="text-gray-800">{message.content}</p>
+              <p className="text-gray-800">{msg.content}</p>
               <div className="flex items-center justify-end gap-2 mt-2">
                 <span className="text-xs text-gray-500">
                   {msg.timestamp.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
+                    hour: '2-digit',
+                    minute: '2-digit'
                   })}
                 </span>
                 {msg.isSent && (
                   <span className="text-xs text-gray-500">
-                    {msg.status === "read" ? "✓✓" : msg.status === "delivered" ? "✓" : "◷"}
+                    {msg.status === 'read' ? '✓✓' :
+                      msg.status === 'delivered' ? '✓' : '◷'}
                   </span>
                 )}
               </div>
@@ -250,17 +187,27 @@ export default function SendMessagePage(): JSX.Element {
               </svg>
             </button>
             <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               placeholder="Type a message"
               className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
               rows={1}
+              required
             />
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
             {file && (
               <div className="absolute bottom-12 left-0 bg-white p-2 rounded-lg shadow flex items-center">
                 <span className="text-sm text-gray-600 mr-2">{file.name}</span>
-                <button type="button" onClick={() => setFile(null)} className="text-red-500 hover:text-red-700">
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="text-red-500 hover:text-red-700"
+                >
                   ×
                 </button>
               </div>
@@ -277,7 +224,12 @@ export default function SendMessagePage(): JSX.Element {
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
             </svg>
           </button>
         </form>
@@ -298,6 +250,5 @@ export default function SendMessagePage(): JSX.Element {
         </div>
       )} */}
     </div>
-  )
+  );
 }
-
