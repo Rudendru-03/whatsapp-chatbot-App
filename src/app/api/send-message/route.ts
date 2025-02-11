@@ -1,81 +1,66 @@
 import { NextResponse } from "next/server";
+import { WhatsAppMessage, messageStorage, MediaType } from "@/lib/types";
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_API = "https://graph.facebook.com/v17.0";
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-async function uploadMedia(file: File): Promise<string> {
+async function uploadMedia(file: File): Promise<{ id: string, type: MediaType }> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("messaging_product", "whatsapp");
 
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
+  const uploadRes = await fetch(
+    `${WHATSAPP_API}/${PHONE_ID}/media`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-      },
-      body: formData,
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      body: formData
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error.message || "Failed to upload media");
-  }
-
-  const data = await response.json();
-  console.log(data.id)
-  return data.id;
+  if (!uploadRes.ok) throw new Error("Media upload failed");
+  
+  const { id, mime_type } = await uploadRes.json();
+  
+  // Media type detection
+  const [typePrefix] = mime_type.split('/');
+  const typeMap: Record<string, MediaType> = {
+    image: 'image',
+    video: 'video',
+    audio: 'audio',
+    application: 'document',
+    text: 'document'
+  };
+  
+  return { id, type: typeMap[typePrefix] || 'document' };
 }
 
-async function sendMessage(
-  phone: string,
-  message: string,
-  mediaId?: string,
-  mediaType?: string,
-  file?: File
-): Promise<void> {
-  const payload: any = {
-    messaging_product: "whatsapp",
-    to: phone,
-    type: mediaType || "text",
-  };
-
-  if (mediaId && mediaType) {
-    if (["image", "video", "document"].includes(mediaType)) {
-      payload[mediaType] = {
-        id: mediaId,
-        caption: message,
-        filename: file?.name,
-      };
-    } else {
-      payload[mediaType] = { id: mediaId };
-    }
-  } else {
-    payload.text = { body: message };
-  }
-
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+async function sendMessage(payload: object): Promise<string> {
+  const res = await fetch(
+    `${WHATSAPP_API}/${PHONE_ID}/messages`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${ACCESS_TOKEN}`
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error.message || "Failed to send message");
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error?.message || "Message sending failed");
   }
+  
+  const data = await res.json();
+  return data.messages[0].id;
 }
 
-export async function POST(req: Request): Promise<NextResponse> {
+export async function POST(req: Request) {
+  let tempId: string | null = null;
+
   try {
     const formData = await req.formData();
     const phone = formData.get("phone") as string;
@@ -89,41 +74,73 @@ export async function POST(req: Request): Promise<NextResponse> {
       );
     }
 
-    let mediaId: string | undefined;
-    let mediaType: string | undefined;
+    // Create temporary message
+    tempId = `temp-${Date.now()}`;
+    const tempMessage: WhatsAppMessage = {
+      id: tempId,
+      content: message,
+      from: phone,
+      timestamp: new Date(),
+      isSent: true,
+      status: 'sent',
+      media: undefined
+    };
+
+    let payload: object;
+    let mediaInfo: { id: string, type: MediaType } | null = null;
 
     if (file) {
-      mediaId = await uploadMedia(file);
-
-      const mimeType = file.type;
-      if (mimeType.startsWith("image/")) {
-        mediaType = "image";
-      } else if (mimeType.startsWith("video/")) {
-        mediaType = "video";
-      } else if (mimeType.startsWith("audio/")) {
-        mediaType = "audio";
-      } else if (
-        mimeType === "application/pdf" ||
-        mimeType === "text/csv" ||
-        mimeType === "application/vnd.ms-excel" ||
-        mimeType ===
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      ) {
-        mediaType = "document";
-      } else {
-        throw new Error(`Unsupported file type: ${mimeType}`);
-      }
+      mediaInfo = await uploadMedia(file);
+      tempMessage.media = {
+        id: 'temp',
+        type: mediaInfo.type,
+        caption: message
+      };
+      payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phone,
+        type: mediaInfo.type,
+        [mediaInfo.type]: {
+          id: mediaInfo.id,
+          caption: message,
+          filename: file.name
+        }
+      };
+    } else {
+      payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phone,
+        type: "text",
+        text: { body: message }
+      };
     }
 
-    await sendMessage(phone, message, mediaId, mediaType, file ?? undefined);
+    messageStorage.add(tempMessage);
+    const messageId = await sendMessage(payload);
 
-    return NextResponse.json({
-      success: true,
-      message: "Message sent successfully!",
+    // Update with final message details
+    messageStorage.update(tempId, {
+      id: messageId,
+      status: 'delivered',
+      ...(mediaInfo && {
+        media: {
+          id: mediaInfo.id,
+          type: mediaInfo.type,
+          caption: message
+        }
+      })
     });
-  } catch (_error: any) {
+
+    return NextResponse.json({ success: true, messageId });
+
+  } catch (error: any) {
+    if (tempId) {
+      messageStorage.update(tempId, { status: 'failed' });
+    }
     return NextResponse.json(
-      { _error: _error.message || "Something went wrong!" },
+      { error: error.message || "Failed to send message" },
       { status: 500 }
     );
   }

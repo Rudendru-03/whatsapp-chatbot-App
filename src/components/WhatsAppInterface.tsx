@@ -1,137 +1,89 @@
 'use client';
 
-import { JSX, useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { WhatsAppMessage, MediaType } from "@/lib/types";
 
-interface Message {
-  content: string;
-  isSent: boolean;
-  timestamp: Date;
-  status: 'sent' | 'delivered' | 'read';
-  from?: string;
-  to?: string;
-  file?: {
-    name: string;
-    type: string;
-    url: string;
-  };
-}
-
-export default function SendMessagePage(): JSX.Element {
-  const [phone, setPhone] = useState<string>("");
-  const [message, setMessage] = useState<string>("");
+export default function WhatsAppInterface() {
+  const [phone, setPhone] = useState("919370435262");
+  const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [responseMessage, setResponseMessage] = useState<{
-    success: boolean;
-    message: string
-  } | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+  const [broadcastNumbers] = useState(["919370435262", "918810609657", "918745813705"]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const broadcastNumbers = ["919370435262", "918810609657", "918745813705"];
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchMessages = async () => {
+    const loadMessages = async () => {
       try {
-        const res = await fetch('/api/messages');
+        const res = await fetch(`/api/messages?phone=${phone}`);
         const data = await res.json();
-        setMessages(data.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        })));
-        setIsLoading(false);
+        setMessages(data);
       } catch (error) {
-        console.error('Error fetching messages:', error);
+        console.error("Failed to load messages:", error);
       }
     };
 
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
+    const interval = setInterval(loadMessages, 2000);
+    loadMessages();
     return () => clearInterval(interval);
-  }, []);
+  }, [phone]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !message) return;
+    if (!input.trim() || !phone) return;
 
-    const newMessage: Message = {
-      content: message,
-      isSent: true,
-      timestamp: new Date(),
-      status: 'sent',
-      to: phone,
-      ...(file && {
-        file: {
-          name: file.name,
-          type: file.type,
-          url: URL.createObjectURL(file)
-        }
-      })
-    };
+    const formData = new FormData();
+    formData.append("phone", phone);
+    formData.append("message", input);
+    if (file) formData.append("file", file);
 
     try {
-      const formData = new FormData();
-      formData.append("phone", phone);
-      formData.append("message", message);
-      if (file) formData.append("file", file);
-
-      const res = await fetch("/api/send-message", {
+      await fetch("/api/send-message", {
         method: "POST",
-        body: formData,
+        body: formData
       });
-
-      const result = await res.json();
-
-      setResponseMessage(res.ok ?
-        { success: true, message: `Message sent to ${phone}` } :
-        { success: false, message: result.error || "Failed to send message" }
-      );
-
-      setMessages(prev => [...prev, {
-        ...newMessage,
-        status: res.ok ? 'delivered' : 'sent'
-      }]);
-
+      
+      setInput("");
+      setFile(null);
     } catch (error) {
-      setResponseMessage({
-        success: false,
-        message: "Failed to connect to server"
-      });
-      setMessages(prev => [...prev, newMessage]);
+      console.error("Sending failed:", error);
     }
-
-    setMessage("");
-    setFile(null);
   };
 
   const broadcastMessages = async () => {
     for (const number of broadcastNumbers) {
       const formData = new FormData();
       formData.append("phone", number);
-      formData.append("message", message);
+      formData.append("message", input);
       if (file) formData.append("file", file);
 
       await fetch("/api/send-message", {
         method: "POST",
-        body: formData,
+        body: formData
       });
     }
-    setResponseMessage({
-      success: true,
-      message: `Broadcasted to ${broadcastNumbers.length} contacts`
-    });
+    setInput("");
+    setFile(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) setFile(e.target.files[0]);
+    setFile(e.target.files?.[0] || null);
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+
+  const getStatusIndicator = (status: string) => {
+    switch (status) {
+      case 'read': return '✓✓';
+      case 'delivered': return '✓';
+      case 'failed': return '⚠️';
+      default: return '◷';
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-[#ece5dd]">
@@ -148,61 +100,47 @@ export default function SendMessagePage(): JSX.Element {
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2]">
-        {isLoading ? (
-          <div className="text-center text-gray-500">Loading messages...</div>
-        ) : messages.map((msg, index) => (
+        {messages.map((message) => (
           <div
-            key={index}
-            className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
+            key={message.id}
+            className={`flex ${message.isSent ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`p-3 rounded-lg max-w-[80%] shadow ${msg.isSent ? 'bg-[#dcf8c6]' : 'bg-white'
-              }`}>
-              {!msg.isSent && (
-                <div className="text-xs text-gray-500 mb-1">
-                  From: {msg.from}
-                </div>
-              )}
-              {msg.file && (
-                <div className="mb-2">
-                  {msg.file.type.startsWith('image/') ? (
-                    <img
-                      src={msg.file.url}
-                      alt={msg.file.name}
-                      className="max-w-full h-48 object-cover rounded"
+            <div className={`p-3 rounded-lg max-w-[80%] shadow ${
+              message.isSent ? 'bg-[#dcf8c6]' : 'bg-white'
+            }`}>
+              {message.media && (
+                <div className="mb-2 text-sm text-gray-500 flex items-center">
+                  <span className="mr-2">{getStatusIndicator(message.status)}</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
-                  ) : (
-                    <div className="text-sm text-gray-500 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      {msg.file.name}
-                    </div>
-                  )}
+                  </svg>
+                  {message.media.type.toUpperCase()} Message
                 </div>
               )}
-              <p className="text-gray-800">{msg.content}</p>
+              <p className="text-gray-800">{message.content}</p>
               <div className="flex items-center justify-end gap-2 mt-2">
                 <span className="text-xs text-gray-500">
-                  {msg.timestamp.toLocaleTimeString([], {
+                  {new Date(message.timestamp).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit'
                   })}
                 </span>
-                {msg.isSent && (
-                  <span className="text-xs text-gray-500">
-                    {msg.status === 'read' ? '✓✓' :
-                      msg.status === 'delivered' ? '✓' : '◷'}
+                {message.isSent && (
+                  <span className={`text-xs ${
+                    message.status === 'failed' ? 'text-red-500' : 'text-gray-500'
+                  }`}>
+                    {getStatusIndicator(message.status)}
                   </span>
                 )}
               </div>
@@ -237,12 +175,11 @@ export default function SendMessagePage(): JSX.Element {
               </svg>
             </button>
             <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message"
               className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
               rows={1}
-              required
             />
             <input
               type="file"
@@ -291,14 +228,6 @@ export default function SendMessagePage(): JSX.Element {
           Broadcast Message
         </button>
       </div>
-
-      {/* Status Messages */}
-      {responseMessage && (
-        <div className={`p-2 text-center text-sm ${responseMessage.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}>
-          {responseMessage.message}
-        </div>
-      )}
     </div>
   );
 }

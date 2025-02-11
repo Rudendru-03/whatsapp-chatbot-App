@@ -1,68 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MediaType, WhatsAppMessage, messageStorage } from "@/lib/types";
 
 const VERIFY_TOKEN = "Omkar_Rahul";
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const queryParams = new URL(req.url).searchParams;
-  const mode = queryParams.get("hub.mode");
-  const token = queryParams.get("hub.verify_token");
-  const challenge = queryParams.get("hub.challenge");
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("Webhook Verified!");
-    return new NextResponse(challenge || "", { status: 200 });
+    return new NextResponse(challenge);
   }
-
-  console.error("Webhook Verification Failed!");
-  return new NextResponse("Forbidden", { status: 403 });
+  return new NextResponse("Verification failed", { status: 403 });
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
     if (body.object === "whatsapp_business_account") {
       for (const entry of body.entry) {
         for (const change of entry.changes) {
+          const value = change.value;
+          
           // Handle incoming messages
-          const messageData = change.value.messages?.[0];
-          if (messageData?.type === 'text') {
-            const messagePayload = {
-              content: messageData.text.body,
+          if (value.messages?.[0]) {
+            const msg = value.messages[0];
+            const newMessage: WhatsAppMessage = {
+              id: msg.id,
+              content: msg.text?.body || "[Media Message]",
+              from: msg.from,
+              timestamp: new Date(parseInt(msg.timestamp) * 1000),
               isSent: false,
-              timestamp: new Date(parseInt(messageData.timestamp) * 1000),
-              status: 'delivered' as const,
-              from: messageData.from,
-              to: messageData.to
+              status: 'delivered',
+              media: msg.type !== 'text' ? {
+                id: msg[msg.type].id,
+                type: msg.type as MediaType,
+                caption: msg[msg.type]?.caption
+              } : undefined
             };
-
-            await fetch(`${process.env.NEXTAUTH_URL}/api/messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(messagePayload)
-            });
+            messageStorage.add(newMessage);
           }
 
-          // Handle message status updates
-          const statusData = change.value.statuses?.[0];
-          if (statusData) {
-            await fetch(`${process.env.NEXTAUTH_URL}/api/messages`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messageId: statusData.id,
-                status: statusData.status,
-                timestamp: new Date(parseInt(statusData.timestamp) * 1000)
-              })
+          // Handle status updates
+          if (value.statuses?.[0]) {
+            const { id, status } = value.statuses[0];
+            messageStorage.update(id, {
+              status: status === 'read' ? 'read' :
+                      status === 'delivered' ? 'delivered' :
+                      status === 'sent' ? 'sent' : 'failed'
             });
           }
         }
       }
     }
 
-    return new NextResponse("Event Received", { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error handling webhook event:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    console.error("Webhook error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

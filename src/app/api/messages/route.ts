@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server";
+import { messageStorage } from "@/lib/types";
 
-interface Message {
-    content: string;
-    isSent: boolean;
-    timestamp: Date;
-    status: 'sent' | 'delivered' | 'read';
-    from?: string;
-    to?: string;
-    file?: {
-        name: string;
-        type: string;
-        url: string;
-    };
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const phone = searchParams.get("phone");
+    
+    if (!phone) {
+      return NextResponse.json(
+        { error: "Phone number required" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(messageStorage.getByPhone(phone));
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch messages" },
+      { status: 500 }
+    );
+  }
 }
-
-let messages: Message[] = [];
-
-export async function GET() {
-    return NextResponse.json(messages);
-}
-
-export async function POST(req: Request) {
-    const message = await req.json();
-    messages.push({
-        ...message,
-        timestamp: new Date(message.timestamp)
-    });
-    return NextResponse.json({ success: true });
-}
-
-export const dynamic = 'force-dynamic';
