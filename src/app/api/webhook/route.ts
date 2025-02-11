@@ -1,82 +1,91 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { messageStore } from "../../../lib/messageStore";
+import { sendEventToAll } from "../../api/messages/route";
 
-const VERIFY_TOKEN = "Omkar_Rahul";
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const queryParams = new URL(req.url).searchParams;
-  const mode = queryParams.get("hub.mode");
-  const token = queryParams.get("hub.verify_token");
-  const challenge = queryParams.get("hub.challenge");
-
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("Webhook Verified!");
-    return new NextResponse(challenge || "", { status: 200 });
-  }
-
-  console.error("Webhook Verification Failed!");
-  return new NextResponse("Forbidden", { status: 403 });
+export interface Message {
+  content: string;
+  isSent: boolean;
+  timestamp: string;
+  status: "received" | "sent";
+  from: string;
+  to: string;
+  mediaType: string;
+  mediaUrl: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest) {
+  const searchParams = req.nextUrl.searchParams;
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
+
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("Webhook verified");
+    return new NextResponse(challenge, { status: 200 });
+  } else {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+}
+
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    console.log("Webhook Event Received:", JSON.stringify(body, null, 2));
-
     if (body.object === "whatsapp_business_account") {
-      const entry = body.entry;
+      for (const entry of body.entry) {
+        for (const change of entry.changes) {
+          if (change.field === "messages") {
+            for (const message of change.value.messages) {
+              const from = message.from;
+              const timestamp = new Date(
+                Number.parseInt(message.timestamp) * 1000
+              ).toISOString();
 
-      for (const e of entry) {
-        const changes = e.changes;
+              let content = "";
+              let mediaType = "";
+              let mediaUrl = "";
 
-        for (const change of changes) {
-          // Handle incoming messages from users
-          const messageData = change.value.messages?.[0];
-          if (messageData) {
-            const from = messageData.from;
-            const messageId = messageData.id;
-            const timestamp = new Date(parseInt(messageData.timestamp) * 1000);
-            const messageType = messageData.type;
+              switch (message.type) {
+                case "text":
+                  content = message.text.body;
+                  break;
+                case "image":
+                case "audio":
+                case "video":
+                case "document":
+                  mediaType = message.type;
+                  mediaUrl = message[message.type].id; // You'll need to fetch the actual URL
+                  content = message[message.type].caption || "";
+                  break;
+                default:
+                  console.log(`Unsupported message type: ${message.type}`);
+                  continue;
+              }
 
-            // Log text messages
-            if (messageType === "text") {
-              const text = messageData.text?.body;
-              console.log(`\n=== User Message Received ===`);
-              console.log(`From: ${from}`);
-              console.log(`Message ID: ${messageId}`);
-              console.log(`Timestamp: ${timestamp}`);
-              console.log(`Text: ${text}`);
+              const newMessage: Message = {
+                content,
+                isSent: false,
+                timestamp,
+                status: "received",
+                from,
+                to: change.value.metadata.display_phone_number,
+                mediaType,
+                mediaUrl,
+              };
+
+              messageStore.addMessage(newMessage);
+              sendEventToAll({ type: "newMessage", message: newMessage });
             }
-            // Add handling for other message types (image, video, etc.) here
-          }
-
-          // Handle message status updates (sent/delivered/read)
-          const statusData = change.value.statuses?.[0];
-          if (statusData) {
-            const messageId = statusData.id;
-            const status = statusData.status;
-            const recipient = statusData.recipient_id;
-            const timestamp = new Date(parseInt(statusData.timestamp) * 1000);
-            const conversation = statusData.conversation?.id;
-            const pricing = statusData.pricing?.billable
-              ? `Cost: ${statusData.pricing.pricing_model}`
-              : "";
-
-            console.log(`\n=== Message Status Update ===`);
-            console.log(`Message ID: ${messageId}`);
-            console.log(`Status: ${status}`);
-            console.log(`Recipient: ${recipient}`);
-            console.log(`Timestamp: ${timestamp}`);
-            console.log(`Conversation ID: ${conversation}`);
-            console.log(`Pricing Model: ${pricing}`);
           }
         }
       }
     }
 
-    return new NextResponse("Event Received", { status: 200 });
+    return new NextResponse("OK", { status: 200 });
   } catch (error) {
-    console.error("Error handling webhook event:", error);
+    console.error("Error processing webhook:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
