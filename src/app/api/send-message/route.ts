@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { messageStore } from "../../../lib/messageStore";
 
 const WHATSAPP_API_URL = "https://graph.facebook.com/v17.0";
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_ACCESS_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID =
+  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -60,9 +61,7 @@ async function uploadMedia(file: File): Promise<string> {
     `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-      },
+      headers: { Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}` },
       body: formData,
     }
   );
@@ -133,6 +132,9 @@ async function sendWhatsAppMessage(
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error.message || "Failed to send message");
+    throw new Error(errorData.error?.message || "Message sending failed");
   }
+
+  const data = await response.json();
+  return data.messages[0].id;
 }

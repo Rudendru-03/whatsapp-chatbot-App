@@ -134,6 +134,15 @@ export default function SendMessagePage(): JSX.Element {
 
   const triggerFileInput = () => fileInputRef.current?.click()
 
+  const getStatusIndicator = (status: string) => {
+    switch (status) {
+      case 'read': return '✓✓';
+      case 'delivered': return '✓';
+      case 'failed': return '⚠️';
+      default: return '◷';
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-[#ece5dd]">
       {/* Chat Header */}
@@ -196,7 +205,7 @@ export default function SendMessagePage(): JSX.Element {
                   {msg.file.name}
                 </div>
               )}
-              <p className="text-gray-800">{msg.content}</p>
+              <p className="text-gray-800">{message.content}</p>
               <div className="flex items-center justify-end gap-2 mt-2">
                 <span className="text-xs text-gray-500">
                   {msg.timestamp.toLocaleTimeString([], {
@@ -241,12 +250,11 @@ export default function SendMessagePage(): JSX.Element {
               </svg>
             </button>
             <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message"
               className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
               rows={1}
-              required
             />
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
             {file && (
