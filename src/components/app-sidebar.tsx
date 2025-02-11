@@ -10,54 +10,21 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-// Define TypeScript types for navigation items
-type SubNavItem = {
-  title: string;
-  url: string;
-  isActive?: boolean;
-};
-
-type NavItem = {
-  title: string;
-  url: string;
-  items?: SubNavItem[]; // Optional property for sub-items
-};
-
-// Navigation data with type enforcement
-const data: { navMain: NavItem[] } = {
-  navMain: [
-    {
-      title: "Send Message",
-      url: "/",
-    },
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      items: [
-        { title: "Analytics", url: "/dashboard/analytics", isActive: false },
-        { title: "Reports", url: "/dashboard/reports", isActive: false },
-      ],
-    },
-    {
-      title: "Products",
-      url: "/products",
-    },
-    {
-      title: "Conference",
-      url: "/conference",
-    },
-  ],
-};
+// Sidebar navigation items
+const navItems = [
+  { title: "Send Message", url: "/" },
+  { title: "Dashboard", url: "/dashboard" },
+  { title: "Products", url: "/products" },
+  { title: "Conference", url: "/conference" },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
+      {/* Sidebar Header */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -68,39 +35,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-semibold">Square Group Tech</span>
-                  <span className=""></span>
                 </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+
+      {/* Sidebar Content (Only Main Items) */}
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            {data.navMain.map((item: NavItem) => (
+            {navItems.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild>
                   <Link href={item.url} className="font-medium">
                     {item.title}
                   </Link>
                 </SidebarMenuButton>
-                {item.items && item.items.length > 0 ? (
-                  <SidebarMenuSub>
-                    {item.items.map((subItem: SubNavItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild isActive={subItem.isActive}>
-                          <Link href={subItem.url}>{subItem.title}</Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                ) : null}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* Sidebar Rail */}
       <SidebarRail />
     </Sidebar>
   );
