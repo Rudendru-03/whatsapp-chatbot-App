@@ -1,6 +1,8 @@
 'use client';
 
 import { JSX, useState, useRef, useEffect } from "react";
+import { MessageSquareMore } from "lucide-react";
+import { Button } from "./ui/button";
 
 interface Message {
   content: string;
@@ -92,6 +94,26 @@ export default function SendMessagePage(): JSX.Element {
       success: true,
       message: `Broadcasted to ${broadcastNumbers.length} contacts`
     });
+  };
+
+  const sendInteractiveMessage = async () => {
+    if (!phone) return;
+
+    try {
+      const formData = new FormData();
+      formData.append("phone", phone);
+
+      const response = await fetch("/api/send-interactive", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send interactive message");
+      }
+    } catch (error) {
+      console.error("Error sending interactive message:", error);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,6 +255,9 @@ export default function SendMessagePage(): JSX.Element {
             </svg>
           </button>
         </form>
+        <Button onClick={sendInteractiveMessage}>
+            <MessageSquareMore className="h-4 w-4" />
+          </Button>
 
         <button
           onClick={broadcastMessages}
