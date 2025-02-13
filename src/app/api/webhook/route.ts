@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as xlsx from "xlsx";
+import * as fs from "fs";
+import * as path from "path";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
-const WHATSAPP_API_TOKEN=process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID=process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_API_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 let messageHistory: any[] = [];
+const filePath = path.join(process.cwd(), "src/data/Users.xlsx");
 
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
@@ -72,6 +76,43 @@ export async function POST(req: NextRequest) {
                             case "notifications_row":
                                 await handleNotificationOptIn(from);
                                 break;
+                        }
+                    }
+                    else if (interaction.type === "nfm_reply") {
+                        try {
+                            const flowResponse = JSON.parse(interaction.nfm_reply.response_json);
+
+                            console.log("Flow submission received from:", from);
+                            console.log("Flow data:", flowResponse);
+                            let jsonData: any[] = [];
+
+                            if (fs.existsSync(filePath)) {
+                                const fileBuffer = fs.readFileSync(filePath);
+                                const workbook = xlsx.read(fileBuffer, { type: "buffer" });
+
+                                const sheetName = workbook.SheetNames[0];
+                                const sheet = workbook.Sheets[sheetName];
+
+                                jsonData = xlsx.utils.sheet_to_json(sheet);
+                            }
+                            jsonData.push({ Name: "Omkar Nilawar", Email: "omkar@squaregroup.tech", Phone: "+919370435262" });
+                            const newWorksheet = xlsx.utils.json_to_sheet(jsonData);
+                            const newWorkbook = xlsx.utils.book_new();
+                            xlsx.utils.book_append_sheet(newWorkbook, newWorksheet, "Sheet1");
+                            xlsx.writeFile(newWorkbook, filePath);
+
+                            messageHistory.push({
+                                type: "flow_submission",
+                                from,
+                                flowData: flowResponse,
+                                timestamp: new Date().toISOString()
+                            });
+
+                            // Send confirmation message
+                            // await sendFlowConfirmation(from, flowResponse);
+                        } catch (error) {
+                            console.error("Error parsing flow response:", error);
+                            // await sendErrorMessage(from);
                         }
                     }
                 }

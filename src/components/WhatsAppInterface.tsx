@@ -79,6 +79,7 @@ export default function SendMessagePage(): JSX.Element {
 
   const broadcastMessages = async () => {
     const numbers = await readExcel();
+    console.log(numbers)
     const limit = pLimit(10);
 
     const requests = numbers.map((number) =>
