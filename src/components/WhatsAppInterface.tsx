@@ -3,6 +3,8 @@
 import { JSX, useState, useRef, useEffect } from "react";
 import { MessageSquareMore } from "lucide-react";
 import { Button } from "./ui/button";
+import { readExcel } from "@/lib/readExcel";
+import pLimit from 'p-limit';
 
 interface Message {
   content: string;
@@ -24,7 +26,6 @@ export default function SendMessagePage(): JSX.Element {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const broadcastNumbers = ["919370435262", "918810609657", "918745813705"];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,7 +35,6 @@ export default function SendMessagePage(): JSX.Element {
     e.preventDefault();
     if (!phone || !message) return;
 
-    // Add message to local state
     const newMessage: Message = {
       content: message,
       isSent: true,
@@ -62,7 +62,6 @@ export default function SendMessagePage(): JSX.Element {
         { success: false, message: result.error || "Failed to send message" }
       );
 
-      // Update message status
       setMessages(prev => prev.map(msg =>
         msg === newMessage ? { ...msg, status: res.ok ? 'delivered' : 'sent' } : msg
       ));
@@ -79,22 +78,36 @@ export default function SendMessagePage(): JSX.Element {
   };
 
   const broadcastMessages = async () => {
-    for (const number of broadcastNumbers) {
-      const formData = new FormData();
-      formData.append("phone", number);
-      formData.append("message", message);
-      if (file) formData.append("file", file);
+    const numbers = await readExcel();
+    const limit = pLimit(10);
 
-      await fetch("/api/send-message", {
-        method: "POST",
-        body: formData,
-      });
-    }
+    const requests = numbers.map((number) =>
+      limit(async () => {
+        const formData = new FormData();
+        formData.append("phone", number);
+        formData.append("message", message);
+        if (file) formData.append("file", file);
+
+        return fetch("/api/send-message", { method: "POST", body: formData });
+      })
+    );
+
+    const results = await Promise.allSettled(requests); //
+
+    const failedNumbers = results
+      .map((result, index) => (result.status === "rejected" ? numbers[index] : null))
+      .filter(Boolean);
+
     setResponseMessage({
       success: true,
-      message: `Broadcasted to ${broadcastNumbers.length} contacts`
+      message: `Broadcasted to ${numbers.length - failedNumbers.length} contacts. Failed: ${failedNumbers.length}`
     });
+
+    if (failedNumbers.length > 0) {
+      console.warn("Failed to send messages to:", failedNumbers);
+    }
   };
+
 
   const sendInteractiveMessage = async () => {
     if (!phone) return;
@@ -186,7 +199,7 @@ export default function SendMessagePage(): JSX.Element {
 
       {/* Input Area */}
       <div className="bg-white p-4 border-t border-gray-200">
-        <form onSubmit={sendMessage} className="flex gap-2">
+        <form onSubmit={sendMessage} className="flex gap-2 items-center">
           <div className="relative flex-1">
             <button
               type="button"
@@ -235,6 +248,11 @@ export default function SendMessagePage(): JSX.Element {
               </div>
             )}
           </div>
+
+          <Button onClick={sendInteractiveMessage} className="p-2 bg-[#075e54] hover:text-[#054d43]">
+            <MessageSquareMore className="h-6 w-6" />
+          </Button>
+
           <button
             type="submit"
             className="bg-[#075e54] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-[#054d43]"
@@ -255,9 +273,6 @@ export default function SendMessagePage(): JSX.Element {
             </svg>
           </button>
         </form>
-        <Button onClick={sendInteractiveMessage}>
-            <MessageSquareMore className="h-4 w-4" />
-          </Button>
 
         <button
           onClick={broadcastMessages}
@@ -266,6 +281,7 @@ export default function SendMessagePage(): JSX.Element {
           Broadcast Message
         </button>
       </div>
+
 
       {/* Status Messages */}
       {/* {responseMessage && (

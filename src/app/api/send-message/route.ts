@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { messageStore } from "../../../lib/messageStore";
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v17.0";
+const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
 const WHATSAPP_ACCESS_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID =
-  process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_PHONE_NUMBER_ID =process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -58,7 +57,7 @@ async function uploadMedia(file: File): Promise<string> {
   formData.append("messaging_product", "whatsapp");
 
   const response = await fetch(
-    `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
+    `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/media`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}` },
