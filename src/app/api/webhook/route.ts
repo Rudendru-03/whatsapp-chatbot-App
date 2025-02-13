@@ -1,91 +1,244 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { messageStore } from "../../../lib/messageStore";
-import { sendEventToAll } from "../../api/messages/route";
+import { NextRequest, NextResponse } from "next/server";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
-
-export interface Message {
-  content: string;
-  isSent: boolean;
-  timestamp: string;
-  status: "received" | "sent";
-  from: string;
-  to: string;
-  mediaType: string;
-  mediaUrl: string;
-}
+const WHATSAPP_API_TOKEN=process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID=process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
+let messageHistory: any[] = [];
 
 export async function GET(req: NextRequest) {
-  const searchParams = req.nextUrl.searchParams;
-  const mode = searchParams.get("hub.mode");
-  const token = searchParams.get("hub.verify_token");
-  const challenge = searchParams.get("hub.challenge");
+    const searchParams = req.nextUrl.searchParams;
+    const mode = searchParams.get("hub.mode");
+    const token = searchParams.get("hub.verify_token");
+    const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("Webhook verified");
-    return new NextResponse(challenge, { status: 200 });
-  } else {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
+        console.log("Webhook verified");
+        return new NextResponse(challenge, { status: 200 });
+    } else {
+        return new NextResponse("Forbidden", { status: 403 });
+    }
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
+    try {
+        const body = await req.json();
+        const entry = body.entry?.[0];
 
-    if (body.object === "whatsapp_business_account") {
-      for (const entry of body.entry) {
-        for (const change of entry.changes) {
-          if (change.field === "messages") {
-            for (const message of change.value.messages) {
-              const from = message.from;
-              const timestamp = new Date(
-                Number.parseInt(message.timestamp) * 1000
-              ).toISOString();
+        if (entry) {
+            const changes = entry.changes?.[0];
+            if (changes && changes.value.messages) {
+                const message = changes.value.messages[0];
+                const from = message.from;
 
-              let content = "";
-              let mediaType = "";
-              let mediaUrl = "";
+                if (message.type === "text") {
+                    messageHistory.push({
+                        type: "received",
+                        from,
+                        message: message.text.body,
+                        timestamp: new Date().toISOString()
+                    });
+                }
 
-              switch (message.type) {
-                case "text":
-                  content = message.text.body;
-                  break;
-                case "image":
-                case "audio":
-                case "video":
-                case "document":
-                  mediaType = message.type;
-                  mediaUrl = message[message.type].id; // You'll need to fetch the actual URL
-                  content = message[message.type].caption || "";
-                  break;
-                default:
-                  console.log(`Unsupported message type: ${message.type}`);
-                  continue;
-              }
+                if (["image", "document", "audio", "video", "sticker"].includes(message.type)) {
+                    const media = message[message.type];
+                    messageHistory.push({
+                        type: "received",
+                        from,
+                        message: `[${message.type.toUpperCase()}] ${media.caption || ''}`,
+                        mediaUrl: media.url || media.link,
+                        mediaType: message.type,
+                        timestamp: new Date().toISOString()
+                    });
+                }
 
-              const newMessage: Message = {
-                content,
-                isSent: false,
-                timestamp,
-                status: "received",
-                from,
-                to: change.value.metadata.display_phone_number,
-                mediaType,
-                mediaUrl,
-              };
+                if (message.type === "interactive") {
+                    const interaction = message.interactive;
+                    if (interaction.type === "list_reply") {
+                        const selected = interaction.list_reply;
+                        messageHistory.push({
+                            type: "received",
+                            from,
+                            message: `${selected.title}`,
+                            timestamp: new Date().toISOString()
+                        });
 
-              messageStore.addMessage(newMessage);
-              sendEventToAll({ type: "newMessage", message: newMessage });
+                        switch (selected.id) {
+                            case "inventory_row":
+                                await sendCatalogMessage(from);
+                                break;
+                            case "shipping_row":
+                                await sendShippingUpdate(from);
+                                break;
+                            case "notifications_row":
+                                await handleNotificationOptIn(from);
+                                break;
+                        }
+                    }
+                }
             }
-          }
         }
-      }
+        return new NextResponse("EVENT_RECEIVED", { status: 200 });
+    } catch (error) {
+        console.error("Error processing webhook event:", error);
+        return new NextResponse("Internal Server Error", { status: 500 });
     }
+}
 
-    return new NextResponse("OK", { status: 200 });
-  } catch (error) {
-    console.error("Error processing webhook:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
-  }
+async function sendCatalogMessage(to: string) {
+    console.log(`Sending catalog message to ${to}`);
+
+    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    const data = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "interactive",
+        interactive: {
+            type: "product_list",
+            header: {
+                type: "text",
+                text: "Explore Our Latest Products",
+            },
+            body: {
+                text: "Check out our best-selling products and choose the one that suits your needs.",
+            },
+            footer: {
+                text: "Tap on a product to learn more.",
+            },
+            action: {
+                catalog_id: "643442681458392",
+                sections: [
+                    {
+                        title: "Trending Products",
+                        product_items: [
+                            { product_retailer_id: "16A" },
+                            { product_retailer_id: "14A" },
+                            { product_retailer_id: "15A" },
+                            { product_retailer_id: "13A" },
+                        ],
+                    },
+                ],
+            },
+        },
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const errorResponse = await response.json();
+            console.error("Error sending catalog:", errorResponse);
+            throw new Error(`Failed to send catalog: ${errorResponse.error.message}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error sending catalog:", error);
+        throw error;
+    }
+}
+
+async function sendShippingUpdate(to: string) {
+    console.log(`Sending shipping update to ${to}`);
+
+    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    const data = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "text",
+        text: {
+            body: "Please enter your order number to check shipping status:"
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const errorResponse = await response.json();
+            console.error("Error sending shipping update:", errorResponse);
+            throw new Error(`Failed to send shipping update: ${errorResponse.error.message}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error sending shipping update:", error);
+        throw error;
+    }
+}
+
+async function handleNotificationOptIn(to: string) {
+    console.log(`Handling notification opt-in for ${to}`);
+
+    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    const data = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "interactive",
+        interactive: {
+            type: "button",
+            body: {
+                text: "Receive notifications about orders and promotions?"
+            },
+            action: {
+                buttons: [
+                    {
+                        type: "reply",
+                        reply: {
+                            id: "optin_yes",
+                            title: "Yes, please!"
+                        }
+                    },
+                    {
+                        type: "reply",
+                        reply: {
+                            id: "optin_no",
+                            title: "Not now"
+                        }
+                    }
+                ]
+            }
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const errorResponse = await response.json();
+            console.error("Error handling notification opt-in:", errorResponse);
+            throw new Error(`Failed to send opt-in: ${errorResponse.error.message}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error handling notification opt-in:", error);
+        throw error;
+    }
 }
