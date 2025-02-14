@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import {
   Table,
   TableBody,
@@ -12,282 +11,298 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-interface Product {
-  id: string;
-  title: string;
-  description: string;
-  websiteLink: string;
-  price: number;
-  category: string;
-  condition: string;
-  availability: boolean;
-  image: string;
+interface PhoneVariant {
+  storage: string;
+  colors: string[];
+  stock: number;
 }
 
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
-    title: '',
-    description: '',
-    websiteLink: '',
+interface Smartphone {
+  id: string;
+  brand: string;
+  model: string;
+  price: number;
+  variants: PhoneVariant[];
+}
+
+const initialPhones: Smartphone[] = [
+  {
+    id: '1',
+    brand: 'Apple',
+    model: 'iPhone 15 Pro',
+    price: 999,
+    variants: [
+      { storage: '128GB', colors: ['#000000', '#FFFFFF'], stock: 50 },
+      { storage: '256GB', colors: ['#000000', '#FFD700'], stock: 30 },
+    ],
+  },
+];
+
+const SOLID_COLORS = [
+  { name: 'Black', value: '#000000' },
+  { name: 'White', value: '#FFFFFF' },
+  { name: 'Red', value: '#FF0000' },
+  { name: 'Blue', value: '#0000FF' },
+  { name: 'Green', value: '#00FF00' },
+  { name: 'Aqua', value: '#00FFFF' },
+  { name: 'Gold', value: '#FFD700' },
+];
+
+export default function SmartphoneCatalog() {
+  const [phones, setPhones] = useState<Smartphone[]>(initialPhones);
+  const [currentModel, setCurrentModel] = useState<Omit<Smartphone, 'id' | 'variants'>>({
+    brand: '',
+    model: '',
     price: 0,
-    category: '',
-    condition: 'new',
-    availability: true,
-    image: '',
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [currentVariant, setCurrentVariant] = useState<PhoneVariant>({
+    storage: '',
+    colors: [],
+    stock: 0,
+  });
+  const [selectedPhoneId, setSelectedPhoneId] = useState<string | null>(null);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (!newProduct.title) newErrors.title = 'Title is required';
-    if (!newProduct.category) newErrors.category = 'Category is required';
-    if (newProduct.price <= 0) newErrors.price = 'Price must be positive';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const updateStock = (phoneId: string, variantIndex: number, newStock: number) => {
+    setPhones(prev => prev.map(phone => {
+      if (phone.id === phoneId) {
+        const updatedVariants = [...phone.variants];
+        updatedVariants[variantIndex].stock = Math.max(0, newStock);
+        return { ...phone, variants: updatedVariants };
+      }
+      return phone;
+    }));
   };
 
-  const handleAddProduct = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await axios.post('/api/products', {
-        ...newProduct,
-        price: newProduct.price,
-      });
-
-      setProducts([...products, response.data]);
-
-      setNewProduct({
-        title: '',
-        description: '',
-        websiteLink: '',
-        price: 0,
-        category: '',
-        condition: 'new',
-        availability: true,
-        image: '',
-      });
-      setIsDialogOpen(false);
-    } catch (err) {
-      setError('Failed to create product. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const addNewModel = () => {
+    if (!currentModel.brand || !currentModel.model || currentModel.price <= 0) return;
+    
+    const newSmartphone: Smartphone = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...currentModel,
+      variants: [],
+    };
+    
+    setPhones([...phones, newSmartphone]);
+    setCurrentModel({ brand: '', model: '', price: 0 });
   };
-  const filteredProducts = products.filter(product =>
-    product.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+  const addVariant = () => {
+    if (!selectedPhoneId || !currentVariant.storage || currentVariant.stock <= 0) return;
+    
+    setPhones(prev => prev.map(phone => {
+      if (phone.id === selectedPhoneId) {
+        return {
+          ...phone,
+          variants: [...phone.variants, currentVariant]
+        };
+      }
+      return phone;
+    }));
+    
+    setCurrentVariant({ storage: '', colors: [], stock: 0 });
+  };
+
+  const discontinueModel = (phoneId: string) => {
+    setPhones(prev => prev.filter(phone => phone.id !== phoneId));
+  };
 
   return (
-    <div className="p-8 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Product Catalog</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>Add Product</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Product</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Title *</Label>
-                  <Input
-                    placeholder="Enter product title"
-                    value={newProduct.title}
-                    onChange={(e) => setNewProduct(prev => ({ ...prev, title: e.target.value }))}
-                  />
-                  {errors.title && <p className="text-sm text-red-500">{errors.title}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Price *</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter price"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct(prev => ({ ...prev, price: Number(e.target.value) }))}
-                  />
-                  {errors.price && <p className="text-sm text-red-500">{errors.price}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select
-                    value={newProduct.category}
-                    onValueChange={(value) => setNewProduct(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="electronics">Electronics</SelectItem>
-                      <SelectItem value="clothing">Clothing</SelectItem>
-                      <SelectItem value="books">Books</SelectItem>
-                      <SelectItem value="home">Home & Kitchen</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Condition</Label>
-                  <Select
-                    value={newProduct.condition}
-                    onValueChange={(value) => setNewProduct(prev => ({ ...prev, condition: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="used">Used</SelectItem>
-                      <SelectItem value="refurbished">Refurbished</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Website Link</Label>
-                  <Input
-                    placeholder="Enter product URL"
-                    value={newProduct.websiteLink}
-                    onChange={(e) => setNewProduct(prev => ({ ...prev, websiteLink: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Availability</Label>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={newProduct.availability}
-                      onCheckedChange={(checked) => setNewProduct(prev => ({ ...prev, availability: checked }))}
-                    />
-                    <span>{newProduct.availability ? 'Available' : 'Out of Stock'}</span>
+    <div className="p-8 space-y-6">
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-2xl">Smartphone Inventory</CardTitle>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button>Add New Model</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add New Smartphone Model</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Brand *</Label>
+                      <Input
+                        placeholder="e.g., Apple"
+                        value={currentModel.brand}
+                        onChange={(e) => setCurrentModel(prev => ({ ...prev, brand: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Model *</Label>
+                      <Input
+                        placeholder="e.g., iPhone 15 Pro"
+                        value={currentModel.model}
+                        onChange={(e) => setCurrentModel(prev => ({ ...prev, model: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label>Base Price *</Label>
+                      <Input
+                        type="number"
+                        placeholder="Enter base price"
+                        value={currentModel.price}
+                        onChange={(e) => setCurrentModel(prev => ({ ...prev, price: Number(e.target.value) }))}
+                      />
+                    </div>
                   </div>
-                </div>
-
-                <div className="col-span-2 space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    placeholder="Enter product description"
-                    value={newProduct.description}
-                    onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-
-                <div className="col-span-2 space-y-2">
-                  <Label>Product Image</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          setNewProduct(prev => ({ ...prev, image: event.target?.result as string }));
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleAddProduct} className="w-full" disabled={isLoading}>
-                {isLoading ? 'Creating...' : 'Create Product'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Input
-        placeholder="Search products by title..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="max-w-sm"
-      />
-
-      <div className="rounded-md border overflow-x-auto">
-        <Table className="min-w-[800px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Image</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Condition</TableHead>
-              <TableHead>Availability</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell>
-                  {product.image && (
-                    <img
-                      src={product.image}
-                      alt={product.title}
-                      className="h-12 w-12 object-cover rounded"
-                    />
-                  )}
-                </TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex flex-col">
-                    <span>{product.title}</span>
-                    <span className="text-sm text-gray-500">{product.websiteLink}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{product.description}</TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>${product.price.toFixed(2)}</TableCell>
-                <TableCell>{product.condition}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs ${product.availability
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                    }`}>
-                    {product.availability ? 'Available' : 'Out of Stock'}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button variant="outline" size="sm">
-                    Edit
+                  <Button onClick={addNewModel} className="w-full">
+                    Create Model
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setProducts(products.filter(p => p.id !== product.id))}
-                  >
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Brand</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Base Price</TableHead>
+                  <TableHead>Variants</TableHead>
+                  <TableHead>Total Stock</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {phones.map((phone) => (
+                  <TableRow key={phone.id}>
+                    <TableCell className="font-semibold">{phone.brand}</TableCell>
+                    <TableCell>{phone.model}</TableCell>
+                    <TableCell>${phone.price.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="variants">
+                          <AccordionTrigger className="py-1">
+                            {phone.variants.length} Variants
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-2">
+                              {phone.variants.map((variant, index) => (
+                                <div key={index} className="flex items-center gap-4 p-2 bg-muted/50 rounded">
+                                  <div className="flex items-center gap-4">
+                                    <Badge variant="outline">{variant.storage}</Badge>
+                                    <div className="flex gap-2">
+                                      {variant.colors.map((color) => (
+                                        <div 
+                                          key={color} 
+                                          className="h-6 w-6 rounded-full border-2 shadow-sm"
+                                          style={{ backgroundColor: color }}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="ml-auto flex items-center gap-4">
+                                    <Input
+                                      type="number"
+                                      value={variant.stock}
+                                      onChange={(e) => updateStock(phone.id, index, Number(e.target.value))}
+                                      className="w-24"
+                                      min="0"
+                                    />
+                                    <Badge className={variant.stock > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                      {variant.stock > 0 ? "In Stock" : "Out of Stock"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </TableCell>
+                    <TableCell>
+                      {phone.variants.reduce((sum, variant) => sum + variant.stock, 0)}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedPhoneId(phone.id)}
+                          >
+                            Add Variant
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Add New Variant</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Storage Capacity *</Label>
+                              <Input
+                                placeholder="e.g., 256GB"
+                                value={currentVariant.storage}
+                                onChange={(e) => setCurrentVariant(prev => ({ ...prev, storage: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Colors *</Label>
+                              <div className="grid grid-cols-4 gap-2">
+                                {SOLID_COLORS.map((color) => (
+                                  <Button
+                                    key={color.value}
+                                    variant={currentVariant.colors.includes(color.value) ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-8 w-8 p-0 rounded-full"
+                                    onClick={() => setCurrentVariant(prev => ({
+                                      ...prev,
+                                      colors: prev.colors.includes(color.value)
+                                        ? prev.colors.filter(c => c !== color.value)
+                                        : [...prev.colors, color.value]
+                                    }))}
+                                  >
+                                    <div 
+                                      className="h-6 w-6 rounded-full"
+                                      style={{ backgroundColor: color.value }}
+                                    />
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Initial Stock *</Label>
+                              <Input
+                                type="number"
+                                value={currentVariant.stock}
+                                onChange={(e) => setCurrentVariant(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                              />
+                            </div>
+                            <Button onClick={addVariant} className="w-full">
+                              Add Variant
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => discontinueModel(phone.id)}
+                      >
+                        Discontinue
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

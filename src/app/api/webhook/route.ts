@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
                     log(`Received ${message.type} message from: ${from}`, '📩');
 
                     if (message.type === "text") {
+                        await sendMainMenu(from);
                         messageHistory.push({
                             type: "received",
                             from,
@@ -330,6 +331,87 @@ async function handleNotificationOptIn(to: string) {
         return responseData;
     } catch (error: any) {
         log(`Opt-in error to ${to}: ${error.message}`, '❌');
+        throw error;
+    }
+}
+
+async function sendMainMenu(to: string) {
+    try {
+        log(`Sending main menu to ${to}`, '📜');
+
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                header: {
+                    type: "text",
+                    text: "Square Group"
+                },
+                body: {
+                    text: "Please select an option from the list:"
+                },
+                footer: {
+                    text: "Click on product for more information"
+                },
+                action: {
+                    button: "Main Menu",
+                    sections: [
+                        {
+                            title: "Our Products",
+                            rows: [
+                                {
+                                    id: "inventory_row",
+                                    title: "📦 Available Inventory",
+                                    description: "Check the latest stock."
+                                },
+                                {
+                                    id: "shipping_row",
+                                    title: "📦 Shipping Status",
+                                    description: "Track your orders."
+                                },
+                                {
+                                    id: "notifications_row",
+                                    title: "🚚 Notifications Opt-In",
+                                    description: "Stay updated on new arrivals"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
+
+        const response = await fetch(`https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            log(`Main menu send failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
+        }
+
+        log(`Main menu sent successfully to ${to}`, '✅');
+        messageHistory.push({
+            type: "sent",
+            to,
+            messageId: responseData.messages?.[0]?.id,
+            messageType: "main_menu",
+            timestamp: new Date().toISOString()
+        });
+
+        return responseData;
+    } catch (error: any) {
+        log(`Main menu send error to ${to}: ${error.message}`, '❌');
         throw error;
     }
 }
