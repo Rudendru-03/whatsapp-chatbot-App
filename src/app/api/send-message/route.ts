@@ -3,7 +3,7 @@ import { messageStore } from "../../../lib/messageStore";
 
 const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
 const WHATSAPP_ACCESS_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID =process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -83,7 +83,7 @@ function getMediaType(mimeType: string): string {
     mimeType === "text/csv" ||
     mimeType === "application/vnd.ms-excel" ||
     mimeType ===
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   ) {
     return "document";
   }
@@ -104,19 +104,28 @@ async function sendWhatsAppMessage(
   };
 
   if (mediaId && mediaType) {
-    if (["image", "video", "document"].includes(mediaType)) {
+    // Handle different media types properly
+    if (mediaType === 'document') {
       payload[mediaType] = {
         id: mediaId,
         caption: message,
-        filename: fileName,
+        filename: fileName,  // filename only for documents
       };
-    } else {
-      payload[mediaType] = { id: mediaId };
+    } else if (['image', 'video'].includes(mediaType)) {
+      payload[mediaType] = {
+        id: mediaId,
+        caption: message,   // caption but no filename
+      };
+    } else if (mediaType === 'audio') {
+      payload[mediaType] = {
+        id: mediaId
+      };
     }
   } else {
     payload.text = { body: message };
   }
 
+  // Rest of the code remains the same
   const response = await fetch(
     `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {

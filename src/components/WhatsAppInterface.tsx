@@ -130,6 +130,26 @@ export default function SendMessagePage(): JSX.Element {
     }
   };
 
+  const sendTemplateMessage = async () => {
+    if (!phone) return;
+
+    try {
+      const formData = new FormData();
+      formData.append("phone", phone);
+
+      const response = await fetch("/api/template", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send template message");
+      }
+    } catch (error) {
+      console.error("Error sending template message:", error);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) setFile(e.target.files[0]);
   };
@@ -274,8 +294,8 @@ export default function SendMessagePage(): JSX.Element {
           </form>
 
           {/* Interactive Message Button (Now outside the form) */}
-          <Button onClick={sendInteractiveMessage} className="p-2 bg-[#075e54] hover:text-[#054d43]">
-            <MessageSquareMore className="h-6 w-6" />
+          <Button onClick={sendTemplateMessage} className="bg-[#075e54] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-[#054d43]">
+            <MessageSquareMore />
           </Button>
         </div>
 

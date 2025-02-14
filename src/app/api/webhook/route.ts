@@ -10,6 +10,12 @@ const WHATSAPP_PHONE_NUMBER_ID = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_I
 let messageHistory: any[] = [];
 const filePath = path.join(process.cwd(), "src/data/Users.xlsx");
 
+// Utility function for consistent logging
+function log(message: string, emoji = '📄') {
+    const timestamp = new Date().toISOString();
+    console.log(`${emoji} [${timestamp}] ${message}`);
+}
+
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const mode = searchParams.get("hub.mode");
@@ -17,10 +23,10 @@ export async function GET(req: NextRequest) {
     const challenge = searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token === VERIFY_TOKEN) {
-        console.log("✅ Webhook verified");
+        log("Webhook verified successfully", '✅');
         return new NextResponse(challenge, { status: 200 });
     } else {
-        console.log("❌ Webhook verification failed");
+        log("Webhook verification failed", '❌');
         return new NextResponse("Forbidden", { status: 403 });
     }
 }
@@ -28,9 +34,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        console.log("📥 Received webhook payload:", JSON.stringify(body, null, 2));
-
         const entry = body.entry?.[0];
+
         if (entry) {
             const changes = entry.changes?.[0];
             if (changes) {
@@ -38,7 +43,8 @@ export async function POST(req: NextRequest) {
                 if (changes.value.messages) {
                     const message = changes.value.messages[0];
                     const from = message.from;
-                    console.log(`📩 New message from ${from}: ${message.type}`);
+
+                    log(`Received ${message.type} message from: ${from}`, '📩');
 
                     if (message.type === "text") {
                         messageHistory.push({
@@ -65,7 +71,8 @@ export async function POST(req: NextRequest) {
                         const interaction = message.interactive;
                         if (interaction.type === "list_reply") {
                             const selected = interaction.list_reply;
-                            console.log(`🔘 List selection from ${from}: ${selected.title}`);
+                            log(`${from} selected menu option: ${selected.title}`, '🔘');
+
                             messageHistory.push({
                                 type: "received",
                                 from,
@@ -88,9 +95,9 @@ export async function POST(req: NextRequest) {
                         else if (interaction.type === "nfm_reply") {
                             try {
                                 const flowResponse = JSON.parse(interaction.nfm_reply.response_json);
-                                console.log("🌊 Flow submission received from:", from, flowResponse);
+                                log(`${from} completed form submission`, '📋');
 
-                                // Handle Excel file update
+                                // Excel handling
                                 let jsonData: any[] = [];
                                 if (fs.existsSync(filePath)) {
                                     const fileBuffer = fs.readFileSync(filePath);
@@ -106,12 +113,11 @@ export async function POST(req: NextRequest) {
                                     Phone: "+919370435262"
                                 });
 
-                                console.log("📝 Appending data to Excel file...");
                                 const newWorksheet = xlsx.utils.json_to_sheet(jsonData);
                                 const newWorkbook = xlsx.utils.book_new();
                                 xlsx.utils.book_append_sheet(newWorkbook, newWorksheet, "Sheet1");
                                 xlsx.writeFile(newWorkbook, filePath);
-                                console.log("✅ Data appended successfully");
+                                log("User data saved to Excel", '💾');
 
                                 messageHistory.push({
                                     type: "flow_submission",
@@ -120,8 +126,8 @@ export async function POST(req: NextRequest) {
                                     timestamp: new Date().toISOString()
                                 });
 
-                            } catch (error) {
-                                console.error("❌ Error processing flow response:", error);
+                            } catch (error: any) {
+                                log(`Form processing failed for ${from}: ${error.message}`, '❌');
                             }
                         }
                     }
@@ -130,10 +136,9 @@ export async function POST(req: NextRequest) {
                 // Handle message status updates
                 if (changes.value.statuses) {
                     const statuses = changes.value.statuses;
-                    console.log(`📊 Received ${statuses.length} status updates`);
-
                     for (const status of statuses) {
-                        console.log(`🔄 Status update for message ${status.id}: ${status.status}`);
+                        log(`Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
+
                         messageHistory.push({
                             type: "status_update",
                             messageId: status.id,
@@ -148,18 +153,17 @@ export async function POST(req: NextRequest) {
             }
         }
         return new NextResponse("EVENT_RECEIVED", { status: 200 });
-    } catch (error) {
-        console.error("❌ Error processing webhook event:", error);
+    } catch (error: any) {
+        log(`Critical error: ${error.message}`, '🚨');
         return new NextResponse("Internal Server Error", { status: 500 });
     }
 }
 
-// Existing functions remain the same with enhanced logging
 async function sendCatalogMessage(to: string) {
-    console.log(`📋 Sending catalog to ${to}`);
-    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
     try {
+        log(`Sending product catalog to ${to}`, '📋');
+        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
         const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -202,9 +206,12 @@ async function sendCatalogMessage(to: string) {
         });
 
         const responseData = await response.json();
-        if (!response.ok) throw responseData;
+        if (!response.ok) {
+            log(`Catalog send failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
+        }
 
-        console.log(`✅ Catalog sent to ${to}, Message ID: ${responseData.messages?.[0]?.id}`);
+        log(`Catalog sent successfully to ${to}`, '✅');
         messageHistory.push({
             type: "sent",
             to,
@@ -214,103 +221,115 @@ async function sendCatalogMessage(to: string) {
         });
 
         return responseData;
-    } catch (error) {
-        console.error("❌ Catalog send failed:", error);
+    } catch (error: any) {
+        log(`Catalog send error to ${to}: ${error.message}`, '❌');
         throw error;
     }
 }
 
 async function sendShippingUpdate(to: string) {
-    console.log(`🚚 Sending shipping update to ${to}`);
-    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-    const data = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: to,
-        type: "text",
-        text: {
-            body: "Please enter your order number to check shipping status:"
-        }
-    };
-
     try {
+        log(`Requesting order number from ${to}`, '🚚');
+        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
         const response = await fetch(url, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to,
+                type: "text",
+                text: { body: "Please enter your order number to check shipping status:" }
+            }),
         });
 
+        const responseData = await response.json();
         if (!response.ok) {
-            const errorResponse = await response.json();
-            console.error("Error sending shipping update:", errorResponse);
-            throw new Error(`Failed to send shipping update: ${errorResponse.error.message}`);
+            log(`Shipping update failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
         }
 
-        return await response.json();
-    } catch (error) {
-        console.error("Error sending shipping update:", error);
+        log(`Shipping update sent to ${to}`, '✅');
+        messageHistory.push({
+            type: "sent",
+            to,
+            messageId: responseData.messages?.[0]?.id,
+            messageType: "shipping_update",
+            timestamp: new Date().toISOString()
+        });
+
+        return responseData;
+    } catch (error: any) {
+        log(`Shipping update error to ${to}: ${error.message}`, '❌');
         throw error;
     }
 }
 
 async function handleNotificationOptIn(to: string) {
-    console.log(`🔔 Handling notifications for ${to}`);
-    const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-    const data = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: to,
-        type: "interactive",
-        interactive: {
-            type: "button",
-            body: {
-                text: "Receive notifications about orders and promotions?"
-            },
-            action: {
-                buttons: [
-                    {
-                        type: "reply",
-                        reply: {
-                            id: "optin_yes",
-                            title: "Yes, please!"
-                        }
-                    },
-                    {
-                        type: "reply",
-                        reply: {
-                            id: "optin_no",
-                            title: "Not now"
-                        }
-                    }
-                ]
-            }
-        }
-    };
-
     try {
+        log(`Sending notification opt-in to ${to}`, '🔔');
+        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
         const response = await fetch(url, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to,
+                type: "interactive",
+                interactive: {
+                    type: "button",
+                    body: {
+                        text: "Receive notifications about orders and promotions?"
+                    },
+                    action: {
+                        buttons: [
+                            {
+                                type: "reply",
+                                reply: {
+                                    id: "optin_yes",
+                                    title: "Yes, please!"
+                                }
+                            },
+                            {
+                                type: "reply",
+                                reply: {
+                                    id: "optin_no",
+                                    title: "Not now"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }),
         });
 
+        const responseData = await response.json();
         if (!response.ok) {
-            const errorResponse = await response.json();
-            console.error("Error handling notification opt-in:", errorResponse);
-            throw new Error(`Failed to send opt-in: ${errorResponse.error.message}`);
+            log(`Opt-in send failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
         }
 
-        return await response.json();
-    } catch (error) {
-        console.error("Error handling notification opt-in:", error);
+        log(`Opt-in request sent to ${to}`, '✅');
+        messageHistory.push({
+            type: "sent",
+            to,
+            messageId: responseData.messages?.[0]?.id,
+            messageType: "notification_optin",
+            timestamp: new Date().toISOString()
+        });
+
+        return responseData;
+    } catch (error: any) {
+        log(`Opt-in error to ${to}: ${error.message}`, '❌');
         throw error;
     }
 }
