@@ -93,7 +93,7 @@ export default function SendMessagePage(): JSX.Element {
       })
     );
 
-    const results = await Promise.allSettled(requests); //
+    const results = await Promise.allSettled(requests);
 
     const failedNumbers = results
       .map((result, index) => (result.status === "rejected" ? numbers[index] : null))
@@ -200,12 +200,61 @@ export default function SendMessagePage(): JSX.Element {
 
       {/* Input Area */}
       <div className="bg-white p-4 border-t border-gray-200">
-        <form onSubmit={sendMessage} className="flex gap-2 items-center">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2"> {/* Flex container to align form and button */}
+          <form onSubmit={sendMessage} className="flex gap-2 items-center flex-1">
+            <div className="relative flex-1">
+              <button
+                type="button"
+                onClick={triggerFileInput}
+                className="absolute left-2 top-2 text-[#075e54] hover:text-[#128c7e]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type a message"
+                className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
+                rows={1}
+                required
+              />
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              {file && (
+                <div className="absolute bottom-12 left-0 bg-white p-2 rounded-lg shadow flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Send Button */}
             <button
-              type="button"
-              onClick={triggerFileInput}
-              className="absolute left-2 top-2 text-[#075e54] hover:text-[#128c7e]"
+              type="submit"
+              className="bg-[#075e54] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-[#054d43]"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -218,62 +267,17 @@ export default function SendMessagePage(): JSX.Element {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                 />
               </svg>
             </button>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message"
-              className="w-full border rounded-2xl py-2 px-4 pl-12 pr-4 resize-none focus:outline-none focus:border-[#075e54]"
-              rows={1}
-              required
-            />
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {file && (
-              <div className="absolute bottom-12 left-0 bg-white p-2 rounded-lg shadow flex items-center">
-                <span className="text-sm text-gray-600 mr-2">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setFile(null)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-          </div>
+          </form>
 
+          {/* Interactive Message Button (Now outside the form) */}
           <Button onClick={sendInteractiveMessage} className="p-2 bg-[#075e54] hover:text-[#054d43]">
             <MessageSquareMore className="h-6 w-6" />
           </Button>
-
-          <button
-            type="submit"
-            className="bg-[#075e54] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-[#054d43]"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-              />
-            </svg>
-          </button>
-        </form>
+        </div>
 
         <button
           onClick={broadcastMessages}
@@ -282,6 +286,8 @@ export default function SendMessagePage(): JSX.Element {
           Broadcast Message
         </button>
       </div>
+
+
 
 
       {/* Status Messages */}
