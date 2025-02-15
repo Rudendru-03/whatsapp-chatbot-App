@@ -19,6 +19,7 @@ export default function SendMessagePage(): JSX.Element {
   const [message, setMessage] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [responseMessage, setResponseMessage] = useState<{
     success: boolean;
     message: string
@@ -78,7 +79,10 @@ export default function SendMessagePage(): JSX.Element {
   };
 
   const broadcastMessages = async () => {
-    const numbers = await readExcel();
+    if (isBroadcasting) return;
+    setIsBroadcasting(true);
+    // const numbers = await readExcel();
+    const numbers = ["919370435262", "918745813705", "919719321451", "12012189440", "16464609200", "12012189436", "12162626123"]
     console.log(numbers)
     const limit = pLimit(10);
 
@@ -107,6 +111,7 @@ export default function SendMessagePage(): JSX.Element {
     if (failedNumbers.length > 0) {
       console.warn("Failed to send messages to:", failedNumbers);
     }
+    setIsBroadcasting(false);
   };
 
 
@@ -301,10 +306,13 @@ export default function SendMessagePage(): JSX.Element {
 
         <button
           onClick={broadcastMessages}
-          className="mt-2 w-full text-center text-sm text-[#075e54] hover:text-[#054d43]"
+          disabled={isBroadcasting}
+          className={`mt-2 w-full text-center text-sm ${isBroadcasting ? "text-gray-400 cursor-not-allowed" : "text-[#075e54] hover:text-[#054d43]"
+            }`}
         >
-          Broadcast Message
+          {isBroadcasting ? "Broadcasting..." : "Broadcast Message"}
         </button>
+
       </div>
 
 
