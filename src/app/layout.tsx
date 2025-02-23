@@ -3,6 +3,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { AppSidebar } from '@/components/app-sidebar'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,6 +25,7 @@ export default function RootLayout({
           <main className="flex-1 min-h-screen">
             <SidebarTrigger />
             {children}
+            <Toaster />
           </main>
         </SidebarProvider>
       </body>
