@@ -136,23 +136,26 @@ export default function SendMessagePage(): JSX.Element {
   };
 
   const sendTemplateMessage = async () => {
-    if (!phone) return;
-
-    try {
+    const numbers = ["919370435262", "918745813705", "919719321451", "12012189440", "16464609200", "12012189436", "12162626123"]
+    for (const phone of numbers) {
       const formData = new FormData();
       formData.append("phone", phone);
 
-      const response = await fetch("/api/template", {
-        method: "POST",
-        body: formData,
-      });
+      console.log(`Sending to: ${phone}`);
 
-      if (!response.ok) {
-        throw new Error("Failed to send template message");
+      try {
+        const response = await fetch("/api/sendMessage", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+        console.log(`Response for ${phone}:`, result);
+      } catch (error) {
+        console.error(`Error sending to ${phone}:`, error);
       }
-    } catch (error) {
-      console.error("Error sending template message:", error);
     }
+
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

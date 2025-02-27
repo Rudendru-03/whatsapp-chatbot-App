@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import { getRabbitMQChannel } from "@/lib/rabbitmq";
 // import { appendToGoogleSheet } from "@/lib/googleSheets";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const entry = body.entry?.[0];
+        const channel = await getRabbitMQChannel();
 
         if (entry) {
             const changes = entry.changes?.[0];
@@ -97,6 +99,12 @@ export async function POST(req: NextRequest) {
                             try {
                                 const flowResponse = JSON.parse(interaction.nfm_reply.response_json);
                                 log(`${from} completed form submission`, '📋');
+                                channel.sendToQueue(
+                                    "whatsapp_incoming_queue",
+                                    Buffer.from(JSON.stringify(flowResponse)),
+                                    { persistent: true }
+                                );
+                                console.log("Form data sent to RabbitMQ");
 
                                 // Excel handling
                                 let jsonData: any[] = [];
@@ -114,11 +122,11 @@ export async function POST(req: NextRequest) {
                                     Phone: "+919370435262"
                                 });
 
-                                const newWorksheet = xlsx.utils.json_to_sheet(jsonData);
-                                const newWorkbook = xlsx.utils.book_new();
-                                xlsx.utils.book_append_sheet(newWorkbook, newWorksheet, "Sheet1");
-                                xlsx.writeFile(newWorkbook, filePath);
-                                log("User data saved to Excel", '💾');
+                                // const newWorksheet = xlsx.utils.json_to_sheet(jsonData);
+                                // const newWorkbook = xlsx.utils.book_new();
+                                // xlsx.utils.book_append_sheet(newWorkbook, newWorksheet, "Sheet1");
+                                // xlsx.writeFile(newWorkbook, filePath);
+                                // log("User data saved to Excel", '💾');
 
                                 messageHistory.push({
                                     type: "flow_submission",
@@ -138,19 +146,14 @@ export async function POST(req: NextRequest) {
                 if (changes.value.statuses) {
                     const statuses = changes.value.statuses;
                     for (const status of statuses) {
-                        log(`Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
-
-                        messageHistory.push({
-                            type: "status_update",
-                            messageId: status.id,
-                            status: status.status,
-                            timestamp: new Date(parseInt(status.timestamp) * 1000).toISOString(),
-                            recipientId: status.recipient_id,
-                            conversation: status.conversation,
-                            pricing: status.pricing
-                        });
+                        if (status.status === "failed") {
+                            log(`❌ Message ${status.id} failed for ${status.recipient_id}.`, '📊');
+                        } else {
+                            log(`✅ Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
+                        }
                     }
                 }
+                
             }
         }
         return new NextResponse("EVENT_RECEIVED", { status: 200 });
