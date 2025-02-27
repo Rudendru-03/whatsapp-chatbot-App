@@ -146,19 +146,14 @@ export async function POST(req: NextRequest) {
                 if (changes.value.statuses) {
                     const statuses = changes.value.statuses;
                     for (const status of statuses) {
-                        log(`Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
-
-                        messageHistory.push({
-                            type: "status_update",
-                            messageId: status.id,
-                            status: status.status,
-                            timestamp: new Date(parseInt(status.timestamp) * 1000).toISOString(),
-                            recipientId: status.recipient_id,
-                            conversation: status.conversation,
-                            pricing: status.pricing
-                        });
+                        if (status.status === "failed") {
+                            log(`❌ Message ${status.id} failed for ${status.recipient_id}.`, '📊');
+                        } else {
+                            log(`✅ Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
+                        }
                     }
                 }
+                
             }
         }
         return new NextResponse("EVENT_RECEIVED", { status: 200 });
