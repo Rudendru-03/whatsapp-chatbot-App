@@ -1,52 +1,83 @@
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+"use client";
+
+import { useEffect, useState } from "react";
+
+interface Message {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  screen_0_First_0?: string;
+  screen_0_Last_1?: string;
+  screen_0_Email_2?: string;
+  flow_token?: string;
+}
 
 export default function Page() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchMessages() {
+      try {
+        const res = await fetch("/api/messages");
+        if (!res.ok) {
+          throw new Error("Failed to fetch messages");
+        }
+        const data = await res.json();
+        console.log("Fetched messages:", data.messages);
+
+        // Transform messages to replace "flow_token" with "phone"
+        const formattedMessages = data.messages.map((msg: Message) => ({
+          firstName: msg.screen_0_First_0 || "N/A",
+          lastName: msg.screen_0_Last_1 || "N/A",
+          email: msg.screen_0_Email_2 || "N/A",
+          phone: msg.flow_token || "N/A",
+        }));
+
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMessages();
+  }, []);
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b">
-          <div className="flex items-center gap-2 px-3">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    Building Your Application
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
-          </div>
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Users</h1>
+
+      {loading ? (
+        <p className="text-gray-600">Loading messages...</p>
+      ) : messages.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-4 py-2 text-left">First Name</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">Last Name</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">Email</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">Phone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {messages.map((msg, index) => (
+                <tr key={index} className="hover:bg-gray-100">
+                  <td className="border border-gray-300 px-4 py-2">{msg.firstName}</td>
+                  <td className="border border-gray-300 px-4 py-2">{msg.lastName}</td>
+                  <td className="border border-gray-300 px-4 py-2">{msg.email}</td>
+                  <td className="border border-gray-300 px-4 py-2">{msg.phone}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
-  )
+      ) : (
+        <p className="text-gray-600">No messages found in the queue.</p>
+      )}
+    </div>
+  );
 }

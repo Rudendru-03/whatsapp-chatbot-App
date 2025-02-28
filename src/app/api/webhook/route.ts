@@ -101,10 +101,15 @@ export async function POST(req: NextRequest) {
                                 log(`${from} completed form submission`, '📋');
                                 channel.sendToQueue(
                                     "whatsapp_incoming_queue",
-                                    Buffer.from(JSON.stringify(flowResponse)),
+                                    Buffer.from(
+                                        JSON.stringify(flowResponse, (key, value) =>
+                                            key === "flow_token" && value === "unused" ? from : value
+                                        )
+                                    ),
                                     { persistent: true }
                                 );
                                 console.log("Form data sent to RabbitMQ");
+                                
 
                                 // Excel handling
                                 let jsonData: any[] = [];
@@ -147,7 +152,7 @@ export async function POST(req: NextRequest) {
                     const statuses = changes.value.statuses;
                     for (const status of statuses) {
                         if (status.status === "failed") {
-                            log(`❌ Message ${status.id} failed for ${status.recipient_id}.`, '📊');
+                            log(`❌ Message ${status.id} failed for ${status.recipient_id}. Full response: ${JSON.stringify(status, null, 2)}`, '📊');
                         } else {
                             log(`✅ Message ${status.id} status: ${status.status} for ${status.recipient_id}`, '📊');
                         }

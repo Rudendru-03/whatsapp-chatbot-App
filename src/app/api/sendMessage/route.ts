@@ -7,7 +7,17 @@ const QUEUE_NAME = "whatsapp_queue";
 
 const sendWhatsAppMessage = async (phone: string) => {
     try {
-        console.log("trying to send message")
+        // const payload = {
+        //     messaging_product: "whatsapp",
+        //     to: phone,
+        //     type: "template",
+        //     template: {
+        //         name: "hello_world",
+        //         language: {
+        //             code: "en_US",
+        //         },
+        //     },
+        // };
         const payload = {
             messaging_product: "whatsapp",
             to: phone,
