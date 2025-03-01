@@ -20,6 +20,8 @@ export default function SendMessagePage(): JSX.Element {
   const [file, setFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [responseMessage, setResponseMessage] = useState<{
     success: boolean;
     message: string
@@ -30,7 +32,29 @@ export default function SendMessagePage(): JSX.Element {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    async function fetchMessages() {
+      try {
+        const res = await fetch("/api/messages");
+        if (!res.ok) {
+          throw new Error("Failed to fetch messages");
+        }
+        const data: { messages: { flow_token: string }[] } = await res.json();
+        console.log("Fetched messages:", data.messages);
+
+        // Extract unique phone numbers
+        const numbers = [...new Set(data.messages.map((msg: any) => String(msg.flow_token)))];
+        setPhoneNumbers(numbers);
+
+        console.log("Extracted phone numbers:", numbers);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMessages();
+  }, []);
 
   const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -82,15 +106,28 @@ export default function SendMessagePage(): JSX.Element {
     if (isBroadcasting) return;
     setIsBroadcasting(true);
     // const numbers = await readExcel();
-    const numbers = ["919370435262", "918745813705", "919719321451", "12012189440", "16464609200", "12012189436", "12162626123"]
-    console.log(numbers)
+    // const numbers = ["919370435262", "918745813705", "919719321451", "12012189440", "16464609200", "12012189436", "12162626123"]
+    // console.log(numbers)
     const limit = pLimit(10);
 
-    const requests = numbers.map((number) =>
+    const requests = phoneNumbers.map((number) =>
       limit(async () => {
         const formData = new FormData();
         formData.append("phone", number);
-        formData.append("message", message);
+        formData.append("message", `*Grade A*\n
+        12 64 $200 | 12 128 $230\n12p 128 $260 | 12p 256 $280\n
+        12pm 128 $340 | 12pm 256 $380\n13 128 $270 | 13mini 128 $240\n
+        13p 128 $350 | 13p 256 $380\n13pm 128 $420 | 13pm 256 $470\n
+        \n
+        *Grade B*\n
+        12 64 $180 | 12 128 $210\n12p 128 $240 | 12p 256 $260\n
+        12pm 128 $310 | 12pm 256 $350\n13 128 $250 | 13mini 128 $220\n
+        13p 128 $320 | 13p 256 $350\n13pm 128 $390 | 13pm 256 $440\n
+        \n
+        *Grade C*\n
+        12 64 $150 | 12 128 $180\n12p 128 $200 | 12p 256 $220\n
+        12pm 128 $270 | 12pm 256 $300\n13 128 $220 | 13mini 128 $200\n
+        13p 128 $280 | 13p 256 $320\n13pm 128 $350 | 13pm 256 $400`);
         if (file) formData.append("file", file);
 
         return fetch("/api/send-message", { method: "POST", body: formData });
@@ -100,12 +137,12 @@ export default function SendMessagePage(): JSX.Element {
     const results = await Promise.allSettled(requests);
 
     const failedNumbers = results
-      .map((result, index) => (result.status === "rejected" ? numbers[index] : null))
+      .map((result, index) => (result.status === "rejected" ? phoneNumbers[index] : null))
       .filter(Boolean);
 
     setResponseMessage({
       success: true,
-      message: `Broadcasted to ${numbers.length - failedNumbers.length} contacts. Failed: ${failedNumbers.length}`
+      message: `Broadcasted to ${phoneNumbers.length - failedNumbers.length} contacts. Failed: ${failedNumbers.length}`
     });
 
     if (failedNumbers.length > 0) {
