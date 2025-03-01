@@ -1,10 +1,18 @@
-import ConferenceForm from '@/components/ConferenceForm'
+import { FlowBuilder } from "@/components/flow/flow-builder";
+import { ViewFlows } from "@/components/flow/flow-view";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function Conference() {
+export default function Home() {
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Conference Management</h1>
-      <ConferenceForm />
+    <div className="flex justify-center">
+      <Tabs defaultValue="flowbuilder" className="w-full max-w-6xl">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="flowbuilder">Flow Builder</TabsTrigger>
+          <TabsTrigger value="viewflows">View Flows</TabsTrigger>
+        </TabsList>
+        <TabsContent value="flowbuilder"><FlowBuilder /></TabsContent>
+        <TabsContent value="viewflows"><ViewFlows /></TabsContent>
+      </Tabs>
     </div>
-  )
+  );
 }

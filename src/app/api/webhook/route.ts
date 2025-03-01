@@ -9,9 +9,8 @@ const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const WHATSAPP_API_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID;
 let messageHistory: any[] = [];
-const filePath = path.join(process.cwd(), "src/data/Users.xlsx");
+let userStates: { [key: string]: string } = {};
 
-// Utility function for consistent logging
 function log(message: string, emoji = '📄') {
     const timestamp = new Date().toISOString();
     console.log(`${emoji} [${timestamp}] ${message}`);
@@ -49,13 +48,19 @@ export async function POST(req: NextRequest) {
                     log(`Received ${message.type} message from: ${from}`, '📩');
 
                     if (message.type === "text") {
-                        await sendMainMenu(from);
-                        messageHistory.push({
-                            type: "received",
-                            from,
-                            message: message.text.body,
-                            timestamp: new Date().toISOString()
-                        });
+                        if (userStates[from] === "awaiting_order_id") {
+                            const orderId = message.text.body;
+                            await sendShippingStatus(from, orderId);
+                            userStates[from] = "";
+                        } else {
+                            await sendMainMenu(from);
+                            messageHistory.push({
+                                type: "received",
+                                from,
+                                message: message.text.body,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
                     }
 
                     if (["image", "document", "audio", "video", "sticker"].includes(message.type)) {
@@ -88,7 +93,8 @@ export async function POST(req: NextRequest) {
                                     await sendCatalogMessage(from);
                                     break;
                                 case "shipping_row":
-                                    await sendShippingUpdate(from);
+                                    await requestOrderNumber(from);
+                                    userStates[from] = "awaiting_order_id";
                                     break;
                                 case "notifications_row":
                                     await handleNotificationOptIn(from);
@@ -109,29 +115,6 @@ export async function POST(req: NextRequest) {
                                     { persistent: true }
                                 );
                                 console.log("Form data sent to RabbitMQ");
-                                
-
-                                // Excel handling
-                                let jsonData: any[] = [];
-                                if (fs.existsSync(filePath)) {
-                                    const fileBuffer = fs.readFileSync(filePath);
-                                    const workbook = xlsx.read(fileBuffer, { type: "buffer" });
-                                    const sheetName = workbook.SheetNames[0];
-                                    const sheet = workbook.Sheets[sheetName];
-                                    jsonData = xlsx.utils.sheet_to_json(sheet);
-                                }
-
-                                jsonData.push({
-                                    Name: "Omkar Nilawar",
-                                    Email: "omkar@squaregroup.tech",
-                                    Phone: "+919370435262"
-                                });
-
-                                // const newWorksheet = xlsx.utils.json_to_sheet(jsonData);
-                                // const newWorkbook = xlsx.utils.book_new();
-                                // xlsx.utils.book_append_sheet(newWorkbook, newWorksheet, "Sheet1");
-                                // xlsx.writeFile(newWorkbook, filePath);
-                                // log("User data saved to Excel", '💾');
 
                                 messageHistory.push({
                                     type: "flow_submission",
@@ -147,7 +130,7 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // Handle message status updates
+                // message status updates
                 if (changes.value.statuses) {
                     const statuses = changes.value.statuses;
                     for (const status of statuses) {
@@ -420,6 +403,90 @@ async function sendMainMenu(to: string) {
         return responseData;
     } catch (error: any) {
         log(`Main menu send error to ${to}: ${error.message}`, '❌');
+        throw error;
+    }
+}
+
+async function requestOrderNumber(to: string) {
+    try {
+        log(`Requesting order number from ${to}`, '🚚');
+        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to,
+                type: "text",
+                text: { body: "Please enter your order number to check shipping status:" }
+            }),
+        });
+
+        const responseData = await response.json();
+        if (!response.ok) {
+            log(`Order number request failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
+        }
+
+        log(`Order number request sent to ${to}`, '✅');
+        messageHistory.push({
+            type: "sent",
+            to,
+            messageId: responseData.messages?.[0]?.id,
+            messageType: "order_number_request",
+            timestamp: new Date().toISOString()
+        });
+
+        return responseData;
+    } catch (error: any) {
+        log(`Order number request error to ${to}: ${error.message}`, '❌');
+        throw error;
+    }
+}
+
+async function sendShippingStatus(to: string, orderId: string) {
+    try {
+        log(`Sending shipping status for order ${orderId} to ${to}`, '🚚');
+        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to,
+                type: "text",
+                text: { body: `Your order ${orderId} has been Shipped` }
+            }),
+        });
+
+        const responseData = await response.json();
+        if (!response.ok) {
+            log(`Shipping status send failed to ${to}: ${responseData.error?.message}`, '❌');
+            throw new Error(responseData.error?.message);
+        }
+
+        log(`Shipping status sent to ${to}`, '✅');
+        messageHistory.push({
+            type: "sent",
+            to,
+            messageId: responseData.messages?.[0]?.id,
+            messageType: "shipping_status",
+            timestamp: new Date().toISOString()
+        });
+
+        return responseData;
+    } catch (error: any) {
+        log(`Shipping status error to ${to}: ${error.message}`, '❌');
         throw error;
     }
 }
