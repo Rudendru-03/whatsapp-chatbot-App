@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
-import { getRabbitMQChannel } from "@/lib/rabbitmq";
+import getRabbitMQChannel from "@/lib/rabbitmq";
 // import { appendToGoogleSheet } from "@/lib/googleSheets";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
