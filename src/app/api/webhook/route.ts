@@ -166,33 +166,23 @@ async function sendCatalogMessage(to: string) {
                 messaging_product: "whatsapp",
                 recipient_type: "individual",
                 to: to,
-                type: "interactive",
-                interactive: {
-                    type: "product_list",
-                    header: {
-                        type: "text",
-                        text: "Explore Our Latest Products",
-                    },
-                    body: {
-                        text: "Check out our best-selling products and choose the one that suits your needs.",
-                    },
-                    footer: {
-                        text: "Tap on a product to learn more.",
-                    },
-                    action: {
-                        catalog_id: "643442681458392",
-                        sections: [
-                            {
-                                title: "Trending Products",
-                                product_items: [
-                                    { product_retailer_id: "16A" },
-                                    { product_retailer_id: "14A" },
-                                    { product_retailer_id: "15A" },
-                                    { product_retailer_id: "13A" },
-                                ],
-                            },
-                        ],
-                    },
+                type: "text",
+                text: {
+                    preview_url: false,
+                    body: `*Grade A*\n
+12 64 $200 | 12 128 $230\n12p 128 $260 | 12p 256 $280\n
+12pm 128 $340 | 12pm 256 $380\n13 128 $270 | 13mini 128 $240\n
+13p 128 $350 | 13p 256 $380\n13pm 128 $420 | 13pm 256 $470\n
+\n
+*Grade B*\n
+12 64 $180 | 12 128 $210\n12p 128 $240 | 12p 256 $260\n
+12pm 128 $310 | 12pm 256 $350\n13 128 $250 | 13mini 128 $220\n
+13p 128 $320 | 13p 256 $350\n13pm 128 $390 | 13pm 256 $440\n
+\n
+*Grade C*\n
+12 64 $150 | 12 128 $180\n12p 128 $200 | 12p 256 $220\n
+12pm 128 $270 | 12pm 256 $300\n13 128 $220 | 13mini 128 $200\n
+13p 128 $280 | 13p 256 $320\n13pm 128 $350 | 13pm 256 $400`
                 },
             }),
         });
@@ -261,68 +251,77 @@ async function sendShippingUpdate(to: string) {
     }
 }
 
-async function handleNotificationOptIn(to: string) {
+const handleNotificationOptIn = async (phone: string) => {
     try {
-        log(`Sending notification opt-in to ${to}`, '🔔');
-        const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                messaging_product: "whatsapp",
-                recipient_type: "individual",
-                to: to,
-                type: "interactive",
-                interactive: {
-                    type: "button",
-                    body: {
-                        text: "Receive notifications about orders and promotions?"
-                    },
-                    action: {
-                        buttons: [
+        // const payload = {
+        //     messaging_product: "whatsapp",
+        //     to: phone,
+        //     type: "template",
+        //     template: {
+        //         name: "hello_world",
+        //         language: {
+        //             code: "en_US",
+        //         },
+        //     },
+        // };
+        const payload = {
+            messaging_product: "whatsapp",
+            to: phone,
+            type: "template",
+            template: {
+                name: "form",
+                language: {
+                    code: "en_US",
+                },
+                components: [
+                    {
+                        type: "header",
+                        parameters: [
                             {
-                                type: "reply",
-                                reply: {
-                                    id: "optin_yes",
-                                    title: "Yes, please!"
-                                }
+                                type: "image",
+                                image: {
+                                    id: "28418804584401992",
+                                },
                             },
-                            {
-                                type: "reply",
-                                reply: {
-                                    id: "optin_no",
-                                    title: "Not now"
-                                }
-                            }
-                        ]
-                    }
-                }
-            }),
-        });
+                        ],
+                    },
+                    {
+                        type: "button",
+                        sub_type: "flow",
+                        index: "0",
+                    },
+                ],
+            },
+        };
 
-        const responseData = await response.json();
+        const response = await fetch(
+            `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const data = await response.json();
+        console.log(response);
+
         if (!response.ok) {
-            log(`Opt-in send failed to ${to}: ${responseData.error?.message}`, '❌');
-            throw new Error(responseData.error?.message);
+            return NextResponse.json(
+                { error: data.error.message },
+                { status: response.status }
+            );
         }
 
-        log(`Opt-in request sent to ${to}`, '✅');
-        messageHistory.push({
-            type: "sent",
-            to,
-            messageId: responseData.messages?.[0]?.id,
-            messageType: "notification_optin",
-            timestamp: new Date().toISOString()
-        });
-
-        return responseData;
-    } catch (error: any) {
-        log(`Opt-in error to ${to}: ${error.message}`, '❌');
-        throw error;
+        return NextResponse.json({ success: "Template message sent" });
+    } catch (error) {
+        return NextResponse.json(
+            { error: "Internal Server Error" },
+            { status: 500 }
+        );
     }
 }
 
@@ -356,17 +355,14 @@ async function sendMainMenu(to: string) {
                                 {
                                     id: "inventory_row",
                                     title: "📦 Available Inventory",
-                                    description: "Check the latest stock."
                                 },
                                 {
                                     id: "shipping_row",
-                                    title: "📦 Shipping Status",
-                                    description: "Track your orders."
+                                    title: "🚚 Shipping Status",
                                 },
                                 {
                                     id: "notifications_row",
-                                    title: "🚚 Notifications Opt-In",
-                                    description: "Stay updated on new arrivals"
+                                    title: "📢 Subscribe Broadcasts",
                                 }
                             ]
                         }
@@ -388,6 +384,7 @@ async function sendMainMenu(to: string) {
 
         if (!response.ok) {
             log(`Main menu send failed to ${to}: ${responseData.error?.message}`, '❌');
+            log(`Response data: ${JSON.stringify(responseData)}`, '❌');
             throw new Error(responseData.error?.message);
         }
 

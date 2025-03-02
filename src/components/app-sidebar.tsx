@@ -18,7 +18,7 @@ const navItems = [
   { title: "Send Message", url: "/" },
   { title: "Users", url: "/dashboard" },
   { title: "Products", url: "/products" },
-  { title: "Conference", url: "/conference" },
+  { title: "Flows", url: "/conference" },
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

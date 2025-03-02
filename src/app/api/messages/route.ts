@@ -5,13 +5,12 @@ const QUEUE_NAME = "whatsapp_incoming_queue";
 
 export async function GET() {
     try {
-        const connection = await amqp.connect("amqp://localhost");
+        const connection = await amqp.connect(`${process.env.RABBITMQ_URL}`);
         const channel = await connection.createChannel();
         await channel.assertQueue(QUEUE_NAME, { durable: true });
 
         let messages: any[] = [];
 
-        // Consume messages without acknowledging (messages will stay in the queue)
         await new Promise<void>((resolve) => {
             channel.consume(
                 QUEUE_NAME,
@@ -20,9 +19,9 @@ export async function GET() {
                         messages.push(JSON.parse(msg.content.toString()));
                     }
                 },
-                { noAck: false } // Don't remove messages from the queue
+                { noAck: false }
             );
-            setTimeout(resolve, 500); // Allow time to fetch messages
+            setTimeout(resolve, 500);
         });
 
         await channel.close();

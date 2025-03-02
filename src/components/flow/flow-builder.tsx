@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../ui/textarea";
 import { Calendar } from "../ui/calendar";
 import { toast } from "sonner";
+import { Separator } from "../ui/separator";
 
 interface ContentItem {
     id: string;
@@ -273,8 +274,8 @@ export const FlowBuilder: React.FC = () => {
                     </Select>
                 ) : content.type === "opt-in" ? (
                     <div className="flex items-center space-x-2">
-                        <Checkbox id="opt-in" />
-                        <label htmlFor="opt-in">{content.content.toString()}</label>
+                        <Checkbox id="opt-in" /><Separator orientation="vertical" />
+                        <label htmlFor="opt-in">{content.content}</label>
                     </div>
                 ) : content.type === "large-heading" ? (
                     <h1 className="text-2xl font-bold">{content.content}</h1>
@@ -422,7 +423,7 @@ export const FlowBuilder: React.FC = () => {
     const submitFlow = async () => {
         try {
             const flowData = {
-                name: "Appointment_One",
+                name: `flow_${Date.now()}`,
                 categories: ["APPOINTMENT_BOOKING"],
                 publish: true,
                 flow_json: constructJsonStructure()

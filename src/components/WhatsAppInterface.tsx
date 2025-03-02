@@ -114,20 +114,7 @@ export default function SendMessagePage(): JSX.Element {
       limit(async () => {
         const formData = new FormData();
         formData.append("phone", number);
-        formData.append("message", `*Grade A*\n
-        12 64 $200 | 12 128 $230\n12p 128 $260 | 12p 256 $280\n
-        12pm 128 $340 | 12pm 256 $380\n13 128 $270 | 13mini 128 $240\n
-        13p 128 $350 | 13p 256 $380\n13pm 128 $420 | 13pm 256 $470\n
-        \n
-        *Grade B*\n
-        12 64 $180 | 12 128 $210\n12p 128 $240 | 12p 256 $260\n
-        12pm 128 $310 | 12pm 256 $350\n13 128 $250 | 13mini 128 $220\n
-        13p 128 $320 | 13p 256 $350\n13pm 128 $390 | 13pm 256 $440\n
-        \n
-        *Grade C*\n
-        12 64 $150 | 12 128 $180\n12p 128 $200 | 12p 256 $220\n
-        12pm 128 $270 | 12pm 256 $300\n13 128 $220 | 13mini 128 $200\n
-        13p 128 $280 | 13p 256 $320\n13pm 128 $350 | 13pm 256 $400`);
+        formData.append("message", message);
         if (file) formData.append("file", file);
 
         return fetch("/api/send-message", { method: "POST", body: formData });
@@ -173,24 +160,22 @@ export default function SendMessagePage(): JSX.Element {
   };
 
   const sendTemplateMessage = async () => {
-    const numbers = ["919370435262", "918745813705", "919719321451", "12012189440", "16464609200", "12012189436", "12162626123"]
-    for (const phone of numbers) {
-      const formData = new FormData();
-      formData.append("phone", phone);
 
-      console.log(`Sending to: ${phone}`);
+    const formData = new FormData();
+    formData.append("phone", phone);
 
-      try {
-        const response = await fetch("/api/sendMessage", {
-          method: "POST",
-          body: formData,
-        });
+    console.log(`Sending to: ${phone}`);
 
-        const result = await response.json();
-        console.log(`Response for ${phone}:`, result);
-      } catch (error) {
-        console.error(`Error sending to ${phone}:`, error);
-      }
+    try {
+      const response = await fetch("/api/sendMessage", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      console.log(`Response for ${phone}:`, result);
+    } catch (error) {
+      console.error(`Error sending to ${phone}:`, error);
     }
 
   };

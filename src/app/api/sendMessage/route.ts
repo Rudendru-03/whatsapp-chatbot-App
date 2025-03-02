@@ -80,7 +80,7 @@ const sendWhatsAppMessage = async (phone: string) => {
 }
 const consumeMessages = async () => {
     try {
-        const connection = await amqp.connect("amqp://localhost");
+        const connection = await amqp.connect(`${process.env.RABBITMQ_URL}`);
         const channel = await connection.createChannel();
         await channel.assertQueue(QUEUE_NAME, { durable: true });
 
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const phone = formData.get("phone") as string;
 
-        const connection = await amqp.connect("amqp://localhost");
+        const connection = await amqp.connect(`${process.env.RABBITMQ_URL}`);
         const channel = await connection.createChannel();
         await channel.assertQueue(QUEUE_NAME, { durable: true });
 

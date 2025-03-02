@@ -6,7 +6,7 @@ let channel: amqp.Channel | null = null;
 export async function getRabbitMQChannel() {
     if (connection && channel) return channel;
 
-    connection = await amqp.connect("amqp://localhost");
+    connection = await amqp.connect(`${process.env.RABBITMQ_URL}`);
     channel = await connection.createChannel();
 
     await channel.assertQueue("whatsapp_outgoing_queue", { durable: true });
